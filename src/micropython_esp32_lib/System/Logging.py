@@ -4,9 +4,9 @@ try:
   from . import Sleep
   from . import Code
 except ImportError:
-  from MicroPython_ESP32_lib.System import Time
-  from MicroPython_ESP32_lib.System import Sleep
-  from MicroPython_ESP32_lib.System import Code
+  from micropython_esp32_lib.System import Time
+  from micropython_esp32_lib.System import Sleep
+  from micropython_esp32_lib.System import Code
 
 # --- Log Handler Interface (DIP) ---
 class LogHandler:

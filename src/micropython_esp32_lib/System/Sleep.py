@@ -6,7 +6,7 @@ import asyncio
 try: 
   from . import Time
 except ImportError:
-  from MicroPython_ESP32_lib.System import Time
+  from micropython_esp32_lib.System import Time
 
 # --- Synchronous Sleep (Standard Naming) ---
 try: sync_s = utime.sleep 

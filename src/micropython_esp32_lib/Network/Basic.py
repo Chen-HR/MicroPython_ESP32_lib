@@ -5,8 +5,8 @@ try:
   from ..System import Logging
   from ..System import Code
 except ImportError:
-  from MicroPython_ESP32_lib.System import Logging
-  from MicroPython_ESP32_lib.System import Code
+  from micropython_esp32_lib.System import Logging
+  from micropython_esp32_lib.System import Code
 
 class Statu(Code.Code):
   pass

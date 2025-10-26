@@ -6,9 +6,9 @@ try:
   from ..System import Sleep
   from . import Basic as NetworkBasic
 except ImportError:
-  from MicroPython_ESP32_lib.System import Logging
-  from MicroPython_ESP32_lib.System import Sleep
-  from MicroPython_ESP32_lib.Network import Basic as NetworkBasic
+  from micropython_esp32_lib.System import Logging
+  from micropython_esp32_lib.System import Sleep
+  from micropython_esp32_lib.Network import Basic as NetworkBasic
 
 class Config:
   """Configuration container for WLAN connection and settings."""

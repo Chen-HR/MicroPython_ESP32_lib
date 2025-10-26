@@ -5,8 +5,8 @@ try:
   from ..System import Logging
   from ..System import Sleep
 except ImportError:
-  from MicroPython_ESP32_lib.System import Logging
-  from MicroPython_ESP32_lib.System import Sleep
+  from micropython_esp32_lib.System import Logging
+  from micropython_esp32_lib.System import Sleep
 
 def sync(ntp_host: str = "time.google.com", log_level: Logging.Level = Logging.LEVEL.INFO) -> bool:
   """  Synchronizes the system time using NTP.
