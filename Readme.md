@@ -1,8 +1,11 @@
 # MicroPython_ESP32_lib
 
 A comprehensive utility library designed for MicroPython on ESP32 devices, providing essential system functionalities and robust network management capabilities. This library aims to simplify common tasks and offer a structured approach to developing embedded applications with MicroPython.
+
 ---
+
 ## Table of Contents
+
 - [Features](#features)
 - [Project Structure](#project-structure)
 - [Installation](#installation)
@@ -18,25 +21,33 @@ A comprehensive utility library designed for MicroPython on ESP32 devices, provi
 - [Compatibility](#compatibility)
 - [Contributing](#contributing)
 - [License](#license)
+
 ---
+
 ## Features
+
 This library offers a modular set of tools to streamline MicroPython development:
 
 ### System Utilities
+
 - **Time Management (`System.Time`)**: Provides functions for precise time retrieval (seconds, milliseconds, microseconds, nanoseconds), timezone handling, and RTC synchronization. Includes flexible time formatting options, including ISO8601.
 - **Sleep & Waiting (`System.Sleep`)**: Offers synchronous and asynchronous sleep functions, along with utility functions (`sync_wait_until`, `async_wait_until`) to wait for conditions with timeouts.
 - **Code Definitions (`System.Code`)**: A base class for defining named integer codes, used throughout the library for status and mode constants.
 - **Logging (`System.Logging`)**: A flexible logging system supporting various levels (DEBUG, INFO, WARNING, ERROR, NONE), custom output handlers, and thread-safe logging for concurrent operations.
 
 ### Network Utilities
+
 - **Basic Network Definitions (`Network.Basic`)**: Encapsulates common MicroPython `network` module constants (WLAN status, power management, interface modes) with robust fallback mechanisms for broader compatibility across different MicroPython versions/ports. Includes an `IPV4Address` class for structured IP handling.
 - **WiFi Management (`Network.WiFi`)**: Provides classes (`Config`, `Connector`) to simplify WiFi activation, connection, disconnection, and configuration (including static IP, hostname, power management). Handles connection retries and comprehensive status monitoring.
 - **NTP Synchronization (`Network.NTP`)**: Functions to synchronize the device's system time with NTP servers, including a retry mechanism for reliable time setting.
+
 ---
+
 ## Project Structure
+
 The library is organized into `System` and `Network` modules, each containing related functionalities.
 
-```
+```text
 \---src
     \---micropython_esp32_lib
         |   __init__.py
@@ -63,9 +74,9 @@ The library is organized into `System` and `Network` modules, each containing re
 ```mermaid
 graph TD
   A[System/Time.py] --> B[System/Sleep.py]
-  C[System/Code.py] --> D[System/Logging.py]
-  A --> D
+  A --> D[System/Logging.py]
   B --> D
+  C[System/Code.py] --> D
   C --> E[Network/Basic.py]
   D --> E
   B --> F[Network/WiFi.py]
@@ -74,8 +85,11 @@ graph TD
   B --> G[Network/NTP.py]
   D --> G
 ```
+
 ---
+
 ## Installation
+
 To use this library on your MicroPython ESP32 device, you can copy the `micropython_esp32_lib` directory from `src/` directly to your device's filesystem.
 
 1. **Copy the `micropython_esp32_lib` folder**:
@@ -83,12 +97,15 @@ To use this library on your MicroPython ESP32 device, you can copy the `micropyt
 
 2. **Handle Relative Imports**:
     The library uses `try...except ImportError` blocks for imports (e.g., `from ..System import Logging` vs `from MicroPython_ESP32_lib.System import Logging`). This pattern allows the modules to be tested individually or run as part of the `MicroPython_ESP32_lib` package. When deploying to your device, ensure the `micropython_esp32_lib` package is correctly placed in a location where MicroPython can find it (e.g., `/lib/`). User scripts will typically use absolute imports like `from micropython_esp32_lib.System import Logging`.
+
 ---
+
 ## Usage
 
 ### System Utilities
 
 #### Logging
+
 Configure and use the flexible logging system:
 
 ```python
@@ -116,6 +133,7 @@ logger.error("A critical error occurred, please investigate!")
 ```
 
 #### Time Management
+
 Work with precise time, timezones, and various formatting options:
 
 ```python
@@ -146,6 +164,7 @@ print(f"Current nanoseconds: {Time.current_ns()}")
 ```
 
 #### Sleep and Waiting
+
 Control program execution flow with synchronous and asynchronous delays and conditional waiting:
 
 ```python
@@ -180,6 +199,7 @@ else:
 ### Network Utilities
 
 #### WiFi Connection
+
 Connect to a WiFi network with robust configuration and status handling:
 
 ```python
@@ -221,6 +241,7 @@ else:
 ```
 
 #### NTP Synchronization
+
 Synchronize the device's system time using an NTP server:
 
 ```python
@@ -252,21 +273,34 @@ if NTP.sync_with_retry(ntp_host="pool.ntp.org", retries=5, delay_ms=1000):
 else:
     logger.error("NTP synchronization failed after multiple retries.")
 ```
+
 ---
+
 ## Dependencies
+
 This library relies on standard MicroPython modules, which are typically built into the firmware:
+
 - `network`
 - `utime`
 - `machine`
 - `ntptime`
 - `asyncio` (for asynchronous sleep functions)
 - `_thread` (optional, for thread-safe logging; falls back to a mock implementation if not available)
+
 ---
+
 ## Compatibility
-This library is primarily developed and tested for **MicroPython on ESP32** devices. While some modules might work on other MicroPython ports, full compatibility is not guaranteed due to hardware-specific implementations (e.g., `machine.RTC`, variations in the `network` module's constants and methods).
+
+This library is primarily developed and tested for **MicroPython on ESP32** devices. While some modules might work on other MicroPython ports, full compatibility is not guaranteed due to hardware-specific implementations (e.g., `machine.RTC`, variations in the `network` module's constants and methods)
+
 ---
+
 ## Contributing
-Contributions are welcome! If you find a bug, have a feature request, or want to improve the code, please feel free to open an issue or submit a pull request on the project's repository.
+
+Contributions are welcome! If you find a bug, have a feature request, or want to improve the code, please feel free to open an issue or submit a pull request on the project's repository
+
 ---
+
 ## License
+
 This project is licensed under the MIT License. A copy of the license can typically be found in the `LICENSE` file at the root of the repository.
