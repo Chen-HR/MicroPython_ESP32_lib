@@ -74,11 +74,11 @@ The library is organized into `System` and `Network` modules, each containing re
 ```mermaid
 graph TD
   A[System/Time.py] --> B[System/Sleep.py]
-  A --> D[System/Logging.py]
-  B --> D
+  B --> D[System/Logging.py]
+  A --> D
   C[System/Code.py] --> D
-  C --> E[Network/Basic.py]
-  D --> E
+  D --> E[Network/Basic.py]
+  C --> E
   B --> F[Network/WiFi.py]
   D --> F
   E --> F
