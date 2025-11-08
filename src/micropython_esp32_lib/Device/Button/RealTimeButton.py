@@ -6,21 +6,23 @@ import asyncio
 try:
   from ...System import Time
   from ...System import Sleep
-  from ...System import Enum # Not directly used in Button but might be in EventHandler.Event
-  from ...System import Logging
+  from ...Utils import Enum # Not directly used in Button but might be in EventHandler.Event
+  from ...Utils import Logging
   from ...System import Digital
-  from ...System import EventHandler
+  from ...Utils import EventHandler
   from . import _digital_signal_filters as DigitalFilters # Import helper functions
 except ImportError:
   from micropython_esp32_lib.System import Time
   from micropython_esp32_lib.System import Sleep
-  from micropython_esp32_lib.System import Enum
-  from micropython_esp32_lib.System import Logging
+  from micropython_esp32_lib.Utils import Enum
+  from micropython_esp32_lib.Utils import Logging
   from micropython_esp32_lib.System import Digital
-  from micropython_esp32_lib.System import EventHandler
+  from micropython_esp32_lib.Utils import EventHandler
   from micropython_esp32_lib.Device.Button import _digital_signal_filters as DigitalFilters
 
 class Button:
+  """need  EventHandler
+  """
   def __init__(self, pin: machine.Pin, pressed_signal: Digital.Signal, released_signal: Digital.Signal, threshold: int, interval_ms: int, log_name: str = "RealTimeButton", log_level: Logging.Level = Logging.LEVEL.INFO) -> None:
     """Button state monitor
 
@@ -350,19 +352,7 @@ class OnMultiClickEvent(EventHandler.Event):
     return False
 
 if __name__ == "__main__":
-  # This __main__ block is for testing and assumes a MicroPython environment.
-  # It largely mirrors the original's test structure but uses the new imports.
-  class Counter:
-    """Simple counter for event tracking."""
-    def __init__(self, name: str, start: int = 0) -> None:
-      self.name: str = name
-      self.cnt: int = start
-    def increment(self) -> None:
-      self.cnt = (self.cnt + 1) % 100
-    def get(self) -> int:
-      return self.cnt
-    def get_name(self) -> str:
-      return self.name
+  from micropython_esp32_lib.Utils.Utils import Counter
 
   class TestHandler(EventHandler.Handler):
     """A concrete Handler to execute button event logic."""

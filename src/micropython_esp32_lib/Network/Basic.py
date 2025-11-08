@@ -2,11 +2,11 @@
 import network
 
 try: 
-  from ..System import Logging
-  from ..System import Enum
+  from ..Utils import Logging
+  from ..Utils import Enum
 except ImportError:
-  from micropython_esp32_lib.System import Logging
-  from micropython_esp32_lib.System import Enum
+  from micropython_esp32_lib.Utils import Logging
+  from micropython_esp32_lib.Utils import Enum
 
 class Statu(Enum.Unit):
   """WLAN connection status constants (network.STAT_*)"""
@@ -24,14 +24,26 @@ class STATU:
   WRONG_PASSWORD  : Statu = Statu("WRONG_PASSWORD" ,202 ) # network.STAT_WRONG_PASSWORD: failed due to incorrect password
   CONNECT_FAIL    : Statu = Statu("CONNECT_FAIL"   ,203 ) # network.STAT_CONNECT_FAIL: failed due to other problems
   try:
-    IDLE            : Statu = Statu("IDLE"           ,network.STAT_IDLE          ) # network.STAT_IDLE: no connection and no activity
-    CONNECTING      : Statu = Statu("CONNECTING"     ,network.STAT_CONNECTING    ) # network.STAT_CONNECTING: connecting in progress
-    GOT_IP          : Statu = Statu("GOT_IP"         ,network.STAT_GOT_IP        ) # network.STAT_GOT_IP: connection successful
-    NO_AP_FOUND     : Statu = Statu("NO_AP_FOUND"    ,network.STAT_NO_AP_FOUND   ) # network.STAT_NO_AP_FOUND: failed because no access point replied
-    WRONG_PASSWORD  : Statu = Statu("WRONG_PASSWORD" ,network.STAT_WRONG_PASSWORD) # network.STAT_WRONG_PASSWORD: failed due to incorrect password
-    CONNECT_FAIL    : Statu = Statu("CONNECT_FAIL"   ,network.STAT_CONNECT_FAIL  ) # network.STAT_CONNECT_FAIL: failed due to other problems
+    IDLE            : Statu = Statu("IDLE"           ,network.STAT_IDLE          ) # type: ignore # network.STAT_IDLE: no connection and no activity
+    CONNECTING      : Statu = Statu("CONNECTING"     ,network.STAT_CONNECTING    ) # type: ignore # network.STAT_CONNECTING: connecting in progress
+    GOT_IP          : Statu = Statu("GOT_IP"         ,network.STAT_GOT_IP        ) # type: ignore # network.STAT_GOT_IP: connection successful
+    NO_AP_FOUND     : Statu = Statu("NO_AP_FOUND"    ,network.STAT_NO_AP_FOUND   ) # type: ignore # network.STAT_NO_AP_FOUND: failed because no access point replied
+    WRONG_PASSWORD  : Statu = Statu("WRONG_PASSWORD" ,network.STAT_WRONG_PASSWORD) # type: ignore # network.STAT_WRONG_PASSWORD: failed due to incorrect password
+    CONNECT_FAIL    : Statu = Statu("CONNECT_FAIL"   ,network.STAT_CONNECT_FAIL  ) # type: ignore # network.STAT_CONNECT_FAIL: failed due to other problems
   except AttributeError:
-    Logging.Log("Network Constants Status", Logging.LEVEL.WARNING).warning("Network status constants (`network.STAT_*`) not fully found. Using internal fallbacks.")
+    tmp=Logging.Log("Network Constants Status", Logging.LEVEL.WARNING)
+    tmp.warning("Network status constants (`network.STAT_*`) not fully found. Using internal fallbacks.")
+    del tmp
+
+  @classmethod
+  def Statu(cls, code: int) -> Statu:
+    if code == cls.IDLE           .value : return cls.IDLE           
+    if code == cls.CONNECTING     .value : return cls.CONNECTING     
+    if code == cls.GOT_IP         .value : return cls.GOT_IP         
+    if code == cls.NO_AP_FOUND    .value : return cls.NO_AP_FOUND    
+    if code == cls.WRONG_PASSWORD .value : return cls.WRONG_PASSWORD 
+    if code == cls.CONNECT_FAIL   .value : return cls.CONNECT_FAIL   
+    return Statu("UNKNOWN", code)
 
 class PowerManagement(Enum.Unit):
   """WLAN power management modes (network.PM_*)"""
@@ -47,15 +59,18 @@ class PM:
   
   try:
     # Attempt to map MicroPython's specific constants if available
-    ACTIVE    : PowerManagement = PowerManagement("ACTIVE"    ,network.MODE_PERFORMANCE)
-    POWERSAVE : PowerManagement = PowerManagement("POWERSAVE" ,network.MODE_NONE       )
+    ACTIVE    : PowerManagement = PowerManagement("ACTIVE"    ,network.MODE_PERFORMANCE) # type: ignore
+    POWERSAVE : PowerManagement = PowerManagement("POWERSAVE" ,network.MODE_NONE       ) # type: ignore
   except AttributeError:
     try:
       # Common esp32/esp8266 power modes
-      ACTIVE    : PowerManagement = PowerManagement("ACTIVE"    ,network.WLAN.PM_ACTIVE   )
-      POWERSAVE : PowerManagement = PowerManagement("POWERSAVE" ,network.WLAN.PM_POWERSAVE)
+      ACTIVE    : PowerManagement = PowerManagement("ACTIVE"    ,network.WLAN.PM_ACTIVE   ) # type: ignore
+      POWERSAVE : PowerManagement = PowerManagement("POWERSAVE" ,network.WLAN.PM_POWERSAVE) # type: ignore
     except AttributeError:
-      Logging.Log("Network Constants Power Management", Logging.LEVEL.WARNING).warning("Network power management constants (`network.PM_*`) not fully found. Using internal fallbacks.")
+      tmp=Logging.Log("Network Constants Power Management", Logging.LEVEL.WARNING)
+      tmp.warning("Network power management constants (`network.PM_*`) not fully found. Using internal fallbacks.")
+      del tmp
+
 class Mode(Enum.Unit):
   """WLAN operating modes (network.MODE_*)"""
   def __init__(self, name: str, id: int):
@@ -67,16 +82,15 @@ class MODE:
   STA : Mode = Mode("STA", 1) # Station mode (client)
   AP  : Mode = Mode("AP" , 2) # Access Point mode
   try:
-    STA : Mode = Mode("STA", network.STA_IF) # Station mode (client)
-    AP  : Mode = Mode("AP" , network.AP_IF ) # Access Point mode
+    STA : Mode = Mode("STA", network.STA_IF) # type: ignore # Station mode (client)
+    AP  : Mode = Mode("AP" , network.AP_IF ) # type: ignore # Access Point mode
   except AttributeError:
-    Logging.Log("Network Constants Mode", Logging.LEVEL.WARNING).warning("Network interface constants (`network.STA_IF`, `network.AP_IF`) not fully found. Using internal fallbacks (1, 2).")
+    tmp=Logging.Log("Network Constants Mode", Logging.LEVEL.WARNING)
+    tmp.warning("Network interface constants (`network.STA_IF`, `network.AP_IF`) not fully found. Using internal fallbacks (1, 2).")
+    del tmp
 
 class IPV4Address:
-  """
-  Represents an IPV4 address as a tuple of integers.
-  NOTE: Micropython's wlan.ifconfig() returns strings, not integers.
-  """
+  NONE = (-1, -1, -1, -1)
   def __init__(self, addr: tuple[int, int, int, int] | str | None = None, log_level: Logging.Level = Logging.LEVEL.WARNING) -> None:
     """
     Initializes an instance of the IPV4Address class.
@@ -87,26 +101,38 @@ class IPV4Address:
 
     Raises:
       ValueError: If the length of the input tuple is not 4,
-        or if any of the octets are not between 0 and 255 (inclusive).
+        or if any of 
 
     """
-    logger = Logging.Log("IPV4 Address", log_level)
-    self.addr = (0, 0, 0, 0) if addr is None else addr
-    try: # parse address as str
-      logger.debug(f"Parse address as string {self.addr}...")
-      self.addr = tuple(map(int, addr.split(".")))
-    except ValueError: # address not str
-      logger.debug(f"address as string {self.addr} failed. Parse as tuple...")
-    if len(self.addr) != 4: # check addr: tuple[int, int, int, int]
-      logger.error("IPV4 address must have exactly 4 octets")
-      raise ValueError("IPV4 address must have exactly 4 octets")
-    else: # addr: tuple[int, int, int, int]
-      for octet in self.addr:
-        if not (0 <= octet <= 255):
-          logger.error("Each octet must be between 0 and 255")
-          raise ValueError("Each octet must be between 0 and 255")
-      self.addr: tuple[int, int, int, int] = addr
+    logger = Logging.Log("IPV4 Address Constructor", log_level)
+    if addr is None: # if addr is None
+      self.addr: tuple[int, int, int, int] = IPV4Address.NONE
+      logger.debug("No address provided. Set to default {IPV4Address.NONE}.")
+    elif isinstance(addr, str): # if addr is str
+      try:
+        logger.debug(f"Parse address as string {addr}...")
+        self.addr_: tuple[int, int, int, int] = tuple(map(int, addr.split("."))) # type: ignore
+      except ValueError:
+        logger.error(f"Failed to parse address string: {addr}")
+        raise ValueError(f"Invalid IP address string: {addr}")
+    elif isinstance(self.addr, tuple): # if addr is tuple
+      logger.debug(f"Parse address as tuple {self.addr}...")
+      if len(self.addr) != 4: # check length
+        logger.error("IPV4 address must have exactly 4 octets")
+        raise ValueError("IPV4 address must have exactly 4 octets")
+      if all(0 <= a <= 255 for a in self.addr): # check range
+        self.addr: tuple[int, int, int, int] = addr
+        logger.debug(f"Address set to {self.addr}")
+      else:
+        logger.error("Each number must be between 0 and 255")
+        raise ValueError("Each number must be between 0 and 255")
+    raise TypeError("Address must be a tuple of 4 integers, a string, or None")
   def __str__(self) -> str:
-    return ".".join(map(str, self.addr))
-  def __tuple__(self) -> tuple[int, int, int, int]:
-    return self.addr
+    if all(0 <= a <= 255 for a in self.addr): # check range
+      return ".".join(map(str, self.addr))
+    else:
+      return "None"    
+  def __repr__(self) -> str:
+    return f"IPV4Address({self.addr})"
+  def str(self) -> str:
+    return self.__str__()

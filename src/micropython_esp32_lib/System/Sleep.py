@@ -1,4 +1,6 @@
-# Sysyem/Sleep.py
+"""
+# file: ./System/Sleep.py
+"""
 import utime
 import asyncio
 
@@ -11,21 +13,21 @@ except ImportError:
 # --- Synchronous Sleep (Standard Naming) ---
 try: sync_s = utime.sleep 
 except: pass
-try: sync_ms = utime.sleep_ms 
+try: sync_ms = utime.sleep_ms # type: ignore
 except: sync_ms = lambda ms: sync_s(ms/1000.0)
-try: sync_us = utime.sleep_us 
+try: sync_us = utime.sleep_us # type: ignore
 except: sync_us = lambda us: sync_ms(us//1000)
-try: sync_ns = utime.sleep_ns 
+try: sync_ns = utime.sleep_ns # type: ignore
 except: sync_ns = lambda ns: sync_ms(ns//1000)
 
 # --- Asynchronous Sleep (Standard Naming) ---
 try: async_s = asyncio.sleep
 except: pass
-try: async_ms = asyncio.sleep_ms
+try: async_ms = asyncio.sleep_ms # type: ignore
 except: async_ms = lambda ms: async_s(ms/1000.0)
-try: async_us = asyncio.sleep_us
+try: async_us = asyncio.sleep_us # type: ignore
 except: async_us = lambda us: async_ms(us//1000)
-try: async_ns = asyncio.sleep_ns
+try: async_ns = asyncio.sleep_ns # type: ignore
 except: async_ns = lambda ns: async_ms(ns//1000)
 
 def sync_wait_until(condition, timeout_ms: float = -1, interval_ms: int = 1) -> bool:

@@ -1,4 +1,9 @@
-# System/Time.py
+"""
+# file: ./System/Time.py
+- Ref: 
+  - https://docs.micropython.org/en/latest/library/utime.html
+  - https://docs.micropython.org/en/v1.15/library/machine.RTC.html
+"""
 import utime
 import machine
 
@@ -28,7 +33,7 @@ def setTimezone(timezone: int | None = None) -> int:
   TIMEZONE = timezone
   return TIMEZONE
 
-make_s = lambda year=2000, month=1, day=1, hour=0, minute=0, second=0, timezone=0: utime.mktime((year, month, day, hour, minute, second, 0, 0)) + timezone * SECONDS_PER_HOUR
+make_s = lambda year=2000, month=1, day=1, hour=0, minute=0, second=0, timezone=0: utime.mktime((year, month, day, hour, minute, second, 0, 0)) + timezone * SECONDS_PER_HOUR # type: ignore
 
 def setRTC(time_seconds: int = 0, timezone: int | None = None) -> None:
   """
@@ -46,8 +51,7 @@ def setRTC(time_seconds: int = 0, timezone: int | None = None) -> None:
   time_seconds += timezone * SECONDS_PER_HOUR
   tm = utime.localtime(time_seconds)
   try:
-    # Note: MicroPython RTC often handles datetime but sub-second is tricky.
-    machine.RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], utime.ticks_ms()))
+    machine.RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], utime.ticks_ms())) # type: ignore
   except:
     pass # RTC not available or not configurable
 
@@ -63,13 +67,11 @@ def current_s(timezone: int | None = None) -> int:
   """
   global TIMEZONE
   if timezone is None: timezone = TIMEZONE
-  return utime.time() + timezone * SECONDS_PER_HOUR
+  return int(utime.time()) + timezone * SECONDS_PER_HOUR
 
 def current_ms(timezone: int | None = None) -> int:
   """
   Returns the current time in milliseconds, with the given timezone offset applied.
-
-  If time_ns is unavailable, this function falls back to using utime.time() for seconds and utime.ticks_ms() for sub-seconds.
 
   Args:
     timezone (int, optional): The timezone offset in hours. Defaults to TIMEZONE.
@@ -79,18 +81,12 @@ def current_ms(timezone: int | None = None) -> int:
   """
   global TIMEZONE
   if timezone is None: timezone = TIMEZONE
-  try:
-    # Use utime.time() for seconds and ticks_ms() for sub-seconds if time_ns is unavailable
-    return (utime.time() + timezone * SECONDS_PER_HOUR) * MS_PER_S + (utime.ticks_ms() % MS_PER_S)
-  except AttributeError:
-    return current_s(timezone) * MS_PER_S
+  try: return utime.time_ns() // NS_PER_MS + timezone * SECONDS_PER_HOUR * MS_PER_S
+  except AttributeError: return current_s(timezone) * MS_PER_S
 
 def current_us(timezone: int | None = None) -> int:
   """
   Returns the current time in microseconds, with the given timezone offset applied.
-
-  If utime.time_ns() is available, it is used to provide the best possible precision.
-  Otherwise, utime.time() is used for seconds and utime.ticks_us() is used for sub-seconds.
 
   Args:
     timezone (int, optional): The timezone offset in hours. Defaults to TIMEZONE.
@@ -100,20 +96,12 @@ def current_us(timezone: int | None = None) -> int:
   """
   global TIMEZONE
   if timezone is None: timezone = TIMEZONE
-
-  try:
-    # utime.time_ns() // 1000 gives total microseconds
-    return utime.time_ns() // NS_PER_MS + timezone * SECONDS_PER_HOUR * US_PER_S
-  except AttributeError:
-    # Fallback: time() for seconds + ticks_us() for sub-seconds (best effort)
-    return current_s(timezone) * US_PER_S + (utime.ticks_us() % US_PER_S)
+  try: return utime.time_ns() // NS_PER_US + timezone * SECONDS_PER_HOUR * US_PER_S
+  except AttributeError: return current_s(timezone) * US_PER_S
 
 def current_ns(timezone: int | None = None) -> int:
   """
   Returns the current time in nanoseconds, with the given timezone offset applied.
-
-  If utime.time_ns() is available, it is used to provide the best possible precision.
-  Otherwise, utime.time() is used for seconds and utime.ticks_us() is used for sub-seconds.
 
   Args:
     timezone (int, optional): The timezone offset in hours. Defaults to TIMEZONE.
@@ -123,12 +111,8 @@ def current_ns(timezone: int | None = None) -> int:
   """
   global TIMEZONE
   if timezone is None: timezone = TIMEZONE
-  try:
-    # MicroPython time_ns is often us or ms precision, but we treat it as the base.
-    return utime.time_ns() + timezone * SECONDS_PER_HOUR * NS_PER_S
-  except AttributeError:
-    # Fallback: time() for seconds + ticks_us() * 1000 for sub-seconds
-    return current_s(timezone) * NS_PER_S + (utime.ticks_us() % US_PER_S) * NS_PER_US
+  try: return utime.time_ns() + timezone * SECONDS_PER_HOUR * NS_PER_S
+  except AttributeError: return current_s(timezone) * NS_PER_S
 
 class TimeFormater:
   # Added 'Z' format for true UTC/ISO8601 when timezone is 0
@@ -150,7 +134,7 @@ class Time:
   The Time object is immutable once created.
   """
   
-  def __init__(self, time_ns: int = 0, timezone: int | None = None, format: str = TimeFormater.DEFAULT_NS):
+  def __init__(self, time_ns: int = 0, timezone: int | None = None, format: str = TimeFormater.DEFAULT_MS):
     """
     Initializes a Time object from a given time in nanoseconds and timezone offset in hours.
 
@@ -170,7 +154,7 @@ class Time:
 
     # 2. Time tuple (localtime expects seconds from epoch)
     # utime.localtime includes the local time offset (timezone * SECONDS_PER_HOUR) already applied in current_ns
-    self.tm: tuple[int, int, int, int, int, int, int, int] = utime.localtime(self.second_from_epoch)
+    self.tm: tuple[int, int, int, int, int, int, int, int] = utime.localtime(self.second_from_epoch) # type: ignore # (year, month, day, hour, minute, second, weekday, yearday) ref https://docs.micropython.org/en/v1.15/library/utime.html
     
     # Date/Time Components (Derived from tm)
     self.year: int = self.tm[0]

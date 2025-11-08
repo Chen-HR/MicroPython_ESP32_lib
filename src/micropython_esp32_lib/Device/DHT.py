@@ -1,5 +1,5 @@
 # src/micropython_esp32_lib/Device/DHT.py
-import _thread as thread # Keep for startMonitor_sync
+import _thread as thread
 import asyncio
 from machine import Pin
 import dht
@@ -7,11 +7,11 @@ import dht
 try:
   from ..System import Time
   from ..System import Sleep
-  from ..System import Logging
+  from ..Utils import Logging
 except ImportError:
   from micropython_esp32_lib.System import Time
   from micropython_esp32_lib.System import Sleep
-  from micropython_esp32_lib.System import Logging
+  from micropython_esp32_lib.Utils import Logging
 
 class DHT:
   def __init__(self, pin: Pin, type: str = "DHT11", log_name: str = "DHT", log_level: Logging.Level = Logging.LEVEL.INFO) -> None:

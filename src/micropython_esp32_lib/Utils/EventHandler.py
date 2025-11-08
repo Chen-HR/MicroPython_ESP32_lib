@@ -1,12 +1,16 @@
+"""
+# file: ./Utils/Logging.py
+"""
+
 import abc
 import _thread as thread
 import asyncio
 
 try: 
   from . import Logging
-  from . import Sleep
+  from ..System import Sleep
 except ImportError:
-  from micropython_esp32_lib.System import Logging
+  from micropython_esp32_lib.Utils import Logging
   from micropython_esp32_lib.System import Sleep
 
 class Handler(abc.ABC):

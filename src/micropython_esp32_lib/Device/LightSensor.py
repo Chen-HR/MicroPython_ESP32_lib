@@ -1,14 +1,13 @@
 # src/micropython_esp32_lib/Device/LightSensor.py
-import utime
 from machine import Pin, ADC # Assuming ADC is available in the machine module
 
 try:
-  from ..System import Utils
-  from ..System import Logging
+  from ..Utils import Utils
+  from ..Utils import Logging
   from ..System import Sleep # For main block test
 except ImportError:
-  from micropython_esp32_lib.System import Utils
-  from micropython_esp32_lib.System import Logging
+  from micropython_esp32_lib.Utils import Utils
+  from micropython_esp32_lib.Utils import Logging
   from micropython_esp32_lib.System import Sleep
 
 class LightSensor: # TODO: samplingTimes: int = 10, interval_ms: int = 10

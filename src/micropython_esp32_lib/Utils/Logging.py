@@ -1,12 +1,14 @@
-# System/Logging.py
+"""
+# file: ./System/Logging.py
+"""
 try: 
-  from . import Time
-  from . import Sleep
+  from ..System import Time
+  from ..System import Sleep
   from . import Enum
 except ImportError:
   from micropython_esp32_lib.System import Time
   from micropython_esp32_lib.System import Sleep
-  from micropython_esp32_lib.System import Enum
+  from micropython_esp32_lib.Utils import Enum
 
 # --- Log Handler Interface (DIP) ---
 class LogHandler:
@@ -20,9 +22,9 @@ class ConsoleHandler(LogHandler):
   def emit(self, record: str) -> None:
     print(record)
 
-_log_lock = None
+_log_lock = None # type: ignore
 try:
-  from _thread import allocate_lock
+  from _thread import allocate_lock # type: ignore
   class Lock: # Placeholder for type consistency
     def acquire(self, waitflag: int = 1, timeout: float = -1): 
       pass
@@ -112,7 +114,7 @@ except Exception:
         This method does not modify the state of the lock.
       """
       return self._locked
-  Lock = Lock_Implementation
+  Lock = Lock_Implementation # type: ignore
   def allocate_lock():
     return Lock()
   _log_lock: Lock = allocate_lock()
@@ -136,14 +138,18 @@ class LEVEL:
   NONE    = Level("NONE", 4)
 
 class Log: 
-  time_formatter = Time.Time
+  # time_formatter_func = Time.Time
+  time_formatter_str: str = Time.TimeFormater.DEFAULT_NS
+  time_formatter_func = lambda _: Time.Time().format(Log.time_formatter_str)
   # Set default handler
   handler: LogHandler = ConsoleHandler() 
 
   @classmethod
-  def set_time_formatter(cls, formatter_func):
-    cls.time_formatter = formatter_func
-
+  def set_time_formatter_str(cls, formatter_str: str):
+    cls.time_formatter_str = formatter_str
+  @classmethod
+  def set_time_formatter_func(cls, formatter_func):
+    cls.time_formatter_func = formatter_func
   @classmethod
   def set_handler(cls, handler_object: LogHandler):
     """Set a custom log output handler (e.g., FileHandler, SocketHandler)."""
@@ -160,7 +166,7 @@ class Log:
 
     try:
       _log_lock.acquire()
-      timestamp = self.time_formatter() 
+      timestamp = self.time_formatter_func() 
       output = f"[{timestamp}] [{level.name}] [{self.name}] {message}"
       self.handler.emit(output) 
     finally:
@@ -179,7 +185,12 @@ class Log:
     self._log(LEVEL.ERROR, message)
 
 if __name__ == "__main__":
-  log = Log("Test Log", LEVEL.INFO)
+  log = Log("Test Log", LEVEL.DEBUG)
+  log.debug("This is a debug message")
+  log.info("This is an info message")
+  log.warning("This is a warning message")
+  log.error("This is an error message")
+  Log.set_time_formatter_str(Time.TimeFormater.ISO8601_MS)
   log.debug("This is a debug message")
   log.info("This is an info message")
   log.warning("This is a warning message")

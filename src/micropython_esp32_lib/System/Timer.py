@@ -1,18 +1,21 @@
-# src/micropython_esp32_lib/System/Timer.py
+"""
+# file: ./System/Timer.py
+"""
 import machine
 import random
-import _thread as thread
 import asyncio
 import inspect
 
 try:
-  from . import Logging
-  from . import Enum
-  from . import Utils
+  from ..System import Sleep
+  from ..Utils import Logging
+  from ..Utils import Enum
+  from ..Utils import Utils
 except ImportError:
-  from micropython_esp32_lib.System import Logging
-  from micropython_esp32_lib.System import Enum
-  from micropython_esp32_lib.System import Utils
+  from micropython_esp32_lib.System import Sleep
+  from micropython_esp32_lib.Utils import Logging
+  from micropython_esp32_lib.Utils import Enum
+  from micropython_esp32_lib.Utils import Utils
 
 class Mode(Enum.Unit):
   """Timer operating modes."""
@@ -131,127 +134,6 @@ class MachineTimer:
   def __repr__(self):
     return self.__str__()
 
-
-class AsyncTimer: 
-  """
-  A timer implementation based on asyncio.sleep for non-blocking,
-  event-loop driven periodic or one-shot events.
-  """
-  idManager = IdManager(Utils.UINT16_MAX)
-  def __init__(self, id: int, log_name: str = "AsyncTimer", log_level: Logging.Level = Logging.LEVEL.INFO):
-    self._timer_id = id if id >= 0 else AsyncTimer.idManager.get()
-    self.logger = Logging.Log(f"{log_name}({self._timer_id})", log_level)
-    self.active = False
-    self._timer_task: asyncio.Task | None = None
-    self.logger.debug(f"Created successfully.")
-  
-  async def _timer_loop(self, period_ms: int, callback, repeat: bool):
-    """The coroutine that manages the timing and callback execution."""
-    period_s = period_ms / 1000.0
-    while True:
-      try:
-        await asyncio.sleep(period_s)
-        # Execute the callback, handling both async and sync functions
-        if inspect.iscoroutinefunction(callback): 
-          await callback(self) # Pass self (the Timer object) as argument
-        else: 
-          callback(self) # Pass self (the Timer object) as argument
-        if not repeat:
-          break # Exit loop for ONE_SHOT mode
-      except asyncio.CancelledError:
-        self.logger.debug(f"Timer {self._timer_id} task cancelled.")
-        break
-      except Exception as e:
-        self.logger.error(f"Error in AsyncTimer loop: {e}")
-        if not repeat: 
-          break # Break on error for ONE_SHOT mode
-        await asyncio.sleep(1) # Add a small delay before continuing on error in PERIODIC mode
-    self.active = False
-    self._timer_task = None
-    self.logger.info(f"Timer {self._timer_id} loop finished.")
-
-  def init(self, period_ms: int, callback, mode: Mode = MODE.PERIODIC) -> None:
-    """
-    Initialises the timer with the given parameters and starts the asyncio task.
-    This method is idempotent: if a timer is already active, it will be deinitialized
-    before a new one is started.
-
-    Args:
-      mode (Mode): The timer operating mode (ONE_SHOT or PERIODIC).
-      period_ms (int): The timer period in milliseconds.
-      callback (callable): The function to call upon timer expiration. Must take one argument (the Timer object itself).
-
-    Raises:
-      ValueError: If period_ms is not positive or callback is None.
-    """
-    # If an existing task is running or done, clean it up before starting a new one.
-    if self._timer_task is not None:
-        if not self._timer_task.done(): # Task is still pending/running
-            self.deinit() # Cancel and clean up the old task
-        else: # Task is done, just clear the reference
-            self._timer_task = None
-            self.active = False # Ensure active flag is consistent
-
-    if period_ms <= 0:
-      raise ValueError("Timer period_ms must be a positive integer.")
-    if callback is None:
-      raise ValueError("Callback function must be provided.")
-    
-    repeat = (mode == MODE.PERIODIC)
-    try:
-      self._timer_task = asyncio.create_task(
-        self._timer_loop(period_ms, callback, repeat)
-      )
-      self.active = True
-      self.logger.info(f"Initialized successfully. Mode: {mode.name}, Period: {period_ms}ms.")
-    except Exception as e:
-      self.logger.error(f"Failed to initialize AsyncTimer: {e}")
-      self._timer_task = None
-      self.active = False
-      raise e
-
-  def deinit(self) -> None:
-    """
-    Deinitialises the timer. Stops the associated asyncio task.
-    """
-    if self._timer_task is None:
-        self.logger.debug("Attempted to deinit an AsyncTimer with no task.")
-        self.active = False
-        return
-    
-    if self._timer_task.done():
-        self.logger.debug("Attempted to deinit an AsyncTimer whose task is already done.")
-        self._timer_task = None
-        self.active = False
-        return
-    
-    try:
-      self._timer_task.cancel()
-      # Give a very short time for cancellation to propagate, but don't await.
-      # This is crucial for synchronous deinit calls.
-      # However, for ISR context, even this might be too much.
-      # The _timer_loop itself will eventually set active=False.
-      self.active = False # Set active to False immediately, but final cleanup is async.
-      self.logger.info(f"Timer {self._timer_id} deinitialized (task cancellation requested).")
-    except Exception as e:
-      self.logger.error(f"Failed to deinitialize Timer {self._timer_id}: {e}")
-  
-  def __del__(self):
-    if self._timer_task is not None and not self._timer_task.done():
-      try:
-        self.deinit() # Request cancellation if still active
-      except Exception as e:
-        self.logger.error(f"Error during AsyncTimer {self._timer_id} deletion cleanup: {e}")
-    AsyncTimer.idManager.free(self._timer_id)
-    self._timer_task = None
-    self.active = False
-    self.logger.debug(f"Timer {self._timer_id} deleted.")
-  
-  def __str__(self):
-    return f"AsyncTimer({self._timer_id}, active={self.active})"
-  def __repr__(self):
-    return self.__str__()
-
 if __name__ == '__main__':
   try:
     from . import Sleep
@@ -295,68 +177,124 @@ if __name__ == '__main__':
   except Exception as e:
     logger.error(f"MachineTimer One-Shot Test failed: {e}")
   logger.info("\n\n")
-  
-  # Asynchronous Test Wrapper
-  async def async_test_suite():
-    logger = Logging.Log("async_test_main", Logging.LEVEL.INFO)
-    logger.info("\n\n")
 
-    # --- Test 3: AsyncTimer Periodic timer ---
-    logger.info("Test 3: AsyncTimer Periodic Timer (id=1)")
-    try:
-      timer0_async = AsyncTimer(id=1, log_level=Logging.LEVEL.DEBUG) 
-      timer0_async.init(mode=MODE.PERIODIC, period_ms=100, callback=test_callback_function)
-      logger.info(f"Is {timer0_async} active: {timer0_async.active}")
-      await asyncio.sleep(1.0) # Non-blocking wait, allows the timer task to run
-      timer0_async.deinit()
-      logger.info(f"Is {timer0_async} active after deinit: {timer0_async.active}")
-    except Exception as e:
-      logger.error(f"AsyncTimer Periodic Test failed: {e}")
-    logger.info("\n\n")
-
-    # --- Test 4: AsyncTimer One-shot timer (Corrected for self-termination) ---
-    logger.info("Test 4: AsyncTimer One-Shot Timer (id=2) - Self-Termination Check")
-    try:
-      timer1_async = AsyncTimer(id=2, log_level=Logging.LEVEL.DEBUG)
-      timer1_async.init(mode=MODE.ONE_SHOT, period_ms=100, callback=test_callback_function)
-      logger.info(f"Is {timer1_async} active: {timer1_async.active}")
-      await asyncio.sleep(0.15) # Wait 150ms > 100ms
-      logger.info(f"Is {timer1_async} active after 150ms: {timer1_async.active}")
-      if timer1_async.active:
-        logger.warning("One-Shot AsyncTimer did not self-terminate! Calling deinit.")
-        timer1_async.deinit()
-    except Exception as e:
-      logger.error(f"AsyncTimer One-Shot Test failed: {e}")
-    logger.info("\n\n")
-
-    # --- Test 5: AsyncTimer Re-init idempotency ---
-    logger.info("Test 5: AsyncTimer Re-init Idempotency Test (id=3)")
-    try:
-        reinit_timer = AsyncTimer(id=3, log_level=Logging.LEVEL.DEBUG)
-        
-        logger.info("  First init (periodic 200ms)...")
-        reinit_timer.init(mode=MODE.PERIODIC, period_ms=200, callback=lambda t: Logging.Log("ReinitCallback", Logging.LEVEL.DEBUG).debug("Callback 200ms"))
-        await asyncio.sleep(0.3) # Let it run for a bit
-        logger.info(f"  Timer active: {reinit_timer.active}. Task: {reinit_timer._timer_task}")
-
-        logger.info("  Second init (periodic 50ms) - should cancel first and start new.")
-        reinit_timer.init(mode=MODE.PERIODIC, period_ms=50, callback=lambda t: Logging.Log("ReinitCallback", Logging.LEVEL.DEBUG).debug("Callback 50ms"))
-        await asyncio.sleep(0.2) # Let new timer run
-        logger.info(f"  Timer active: {reinit_timer.active}. Task: {reinit_timer._timer_task}")
-        reinit_timer.deinit()
-        logger.info(f"  Timer active after deinit: {reinit_timer.active}")
-    except Exception as e:
-        logger.error(f"AsyncTimer Re-init Idempotency Test failed: {e}")
-    logger.info("\n\n")
-
-
-  # --- Run AsyncTimer Tests ---
-  logger.info("Running AsyncTimer Tests...")
-  try:
-    asyncio.run(async_test_suite()) 
-  except KeyboardInterrupt:
-    logger.info("Asyncio test suite interrupted.")
-  finally:
-    logger.info("AsyncTimer Tests finished.")
-  
   logger.info("All Timer Wrapper Tests completed.")
+
+
+async def asyncTimer(interval_ms: int, callback, callback_args: tuple = (), callback_kwargs: dict = {}, repeat: bool = False, log_name: str = "AsyncTimer", log_level: Logging.Level = Logging.LEVEL.INFO) -> asyncio.Task:
+  logger = Logging.Log(f"{log_name}", log_level)
+  logger.debug(f"Creating async timer with interval {interval_ms}ms.")
+  async def timer_task():
+    # logger.debug(f"Async timer started with interval {interval_ms}ms.")
+    # await Sleep.async_ms(interval_ms)
+    # logger.debug(f"Async timer executing callback after {interval_ms}ms.")
+    # if inspect.iscoroutinefunction(callback):
+    #   await callback(*callback_args, **callback_kwargs)
+    # else:
+    #   callback(*callback_args, **callback_kwargs)
+    # logger.debug(f"Async timer callback execution completed.")
+    while True:
+      await Sleep.async_ms(interval_ms)
+      logger.debug(f"Async timer executing callback after {interval_ms}ms.")
+      if inspect.iscoroutinefunction(callback):
+        await callback(*callback_args, **callback_kwargs)
+      else:
+        callback(*callback_args, **callback_kwargs)
+      logger.debug(f"Async timer callback execution completed.")
+      if not repeat:
+        break
+  logger.debug(f"Async timer task created.")
+  task = asyncio.create_task(timer_task())
+  return task
+
+
+if __name__ == '__main__':
+  async def callback1():
+    Logging.Log("callback_function", Logging.LEVEL.INFO).info("Async Timer Callback Executed.")
+  async def callback2(arg1, arg2, arg3):
+    Logging.Log("callback_function", Logging.LEVEL.INFO).info(f"Async Timer Callback Executed. callback2({arg1}, {arg2}, {arg3})")
+  logger = Logging.Log("main", Logging.LEVEL.INFO)
+  logger.info("Starting Async Timer Test.")
+  async def main():
+    logger = Logging.Log("async_main", Logging.LEVEL.INFO)
+    logger.info("Scheduling Async Timer for 2000ms.")
+    await asyncTimer(1000, callback1, repeat=True, log_name="asyncTimer1", log_level=Logging.LEVEL.DEBUG)
+    await asyncTimer(1500, lambda: Logging.Log("callback_lambda", Logging.LEVEL.INFO).info("Async Timer Callback Executed."), repeat=True, log_name="asyncTimer2", log_level=Logging.LEVEL.DEBUG)
+    await asyncTimer(2000, callback2, (1, 2, 3), repeat=False, log_name="asyncTimer3", log_level=Logging.LEVEL.DEBUG)
+    await asyncTimer(2500, lambda arg1, arg2, arg3: Logging.Log("callback_lambda", Logging.LEVEL.INFO).info(f"Async Timer Callback Executed. callback2({arg1}, {arg2}, {arg3})"), (4, 5, 6), repeat=False, log_name="asyncTimer4", log_level=Logging.LEVEL.DEBUG)
+    logger.info("Async Timer Scheduled for 2000ms.")
+    await Sleep.async_ms(3000)
+    logger.info("Async Timer Test Scheduled.")
+  asyncio.run(main())
+  logger.info("Async Timer Test Completed.")
+
+class AsyncTimer:
+  def __init__(self, interval_ms: int, callback, callback_args: tuple = (), callback_kwargs: dict = {}, repeat: bool = False, start: bool = True, log_name: str = "AsyncTimer", log_level: Logging.Level = Logging.LEVEL.INFO):
+    self.logger = Logging.Log(f"{log_name}", log_level)
+    self.active = False
+    self._timer_task: asyncio.Task | None = None
+    self.interval_ms = interval_ms
+    self.callback = callback
+    self.callback_args = callback_args
+    self.callback_kwargs = callback_kwargs
+    self.repeat = repeat
+    self.logger.debug(f"Created successfully.")
+    if start: self.start()
+  async def _run_timer(self):
+    self.active = True
+    self.logger.debug(f"Async timer started with interval {self.interval_ms}ms. Repeat: {self.repeat}")
+    while self.active:
+      await Sleep.async_ms(self.interval_ms)
+      self.logger.debug(f"Async timer executing callback after {self.interval_ms}ms.")
+      if inspect.iscoroutinefunction(self.callback):
+        await self.callback(*self.callback_args, **self.callback_kwargs)
+      else:
+        self.callback(*self.callback_args, **self.callback_kwargs)
+      self.logger.debug(f"Async timer callback execution completed.")
+      if not self.repeat:
+        break
+    self.active = False
+    self.logger.debug(f"Async timer stopped.")
+  def start(self):
+    if not self.active:
+      self._timer_task = asyncio.create_task(self._run_timer())
+      self.logger.debug(f"Async timer task started.")
+  def stop(self):
+    if self.active:
+      self.active = False
+      if self._timer_task: self._timer_task.cancel()
+      self.logger.debug(f"Async timer task stopped.")
+    else:
+      self.logger.debug(f"Async timer task already stopped.")
+    self._timer_task = None
+    self.logger.debug(f"Async timer task reference cleared.")
+    self.logger.debug(f"Async timer stopped.")
+  def restart(self):
+    self.stop()
+    self.start()
+  def __del__(self):
+    self.stop()
+    self.logger.debug(f"Async timer deleted.")
+
+if __name__ == '__main__':
+  async def callback1():
+    Logging.Log("callback_function", Logging.LEVEL.INFO).info("AsyncTimer Class Callback Executed.")
+  async def callback2(arg1, arg2, arg3):
+    Logging.Log("callback_function", Logging.LEVEL.INFO).info(f"AsyncTimer Class Callback Executed. callback2({arg1}, {arg2}, {arg3})")
+  logger = Logging.Log("main", Logging.LEVEL.INFO)
+  logger.info("Starting AsyncTimer Class Test.")
+  async def main():
+    logger = Logging.Log("async_main", Logging.LEVEL.INFO)
+    logger.info("Creating AsyncTimer instances.")
+    timer1 = AsyncTimer(1000, callback1, log_name="AsyncTimerClass1", log_level=Logging.LEVEL.DEBUG, repeat=True)
+    timer2 = AsyncTimer(1500, lambda: Logging.Log("callback_lambda", Logging.LEVEL.INFO).info("AsyncTimer Class Callback Executed."), log_name="AsyncTimerClass2", log_level=Logging.LEVEL.DEBUG, repeat=True)
+    timer3 = AsyncTimer(2000, callback2, (1, 2, 3), log_name="AsyncTimerClass3", log_level=Logging.LEVEL.DEBUG, repeat=False)
+    timer4 = AsyncTimer(2500, lambda arg1, arg2, arg3: Logging.Log("callback_lambda", Logging.LEVEL.INFO).info(f"AsyncTimer Class Callback Executed. callback2({arg1}, {arg2}, {arg3})"), (4, 5, 6), log_name="AsyncTimerClass4", log_level=Logging.LEVEL.DEBUG, repeat=False)
+    logger.info("AsyncTimer instances created and started.")
+    await Sleep.async_ms(7000)
+    logger.info("Stopping AsyncTimer instances.")
+    timer1.stop()
+    timer2.stop()
+    logger.info("AsyncTimer Class Test Completed.")
+  asyncio.run(main())
+  logger.info("AsyncTimer Class Test Finished.")

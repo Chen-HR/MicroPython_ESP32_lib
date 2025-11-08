@@ -1,12 +1,14 @@
-# System/Digital.py
+"""
+# file: ./System/Digital.py
+"""
 import machine
 
 try:
-  from . import Enum
-  from . import Logging
+  from ..Utils import Enum
+  from ..Utils import Logging
 except ImportError:
-  from micropython_esp32_lib.System import Enum
-  from micropython_esp32_lib.System import Logging
+  from micropython_esp32_lib.Utils import Enum
+  from micropython_esp32_lib.Utils import Logging
 
 # Selects the pin mode.
 #   Pin.IN
