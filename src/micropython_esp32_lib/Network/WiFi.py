@@ -111,7 +111,6 @@ class Config:
       raise e
     return config
 class Connector:
-  """Handles activation, connection, and configuration of the Wi-Fi interface."""
   def __init__(self, interface: NetworkBasic.Mode = NetworkBasic.MODE.STA, interval_ms: int = 100, connecting_timeout_ms: int = 10000, idle_timeout_ms: int = 10000, log_name: str = "Wi-Fi Connector", log_level: Logging.Level = Logging.LEVEL.INFO) -> None:
     """Initializes the Wi-Fi Connector with the given parameters.
     Parameters:
@@ -129,6 +128,69 @@ class Connector:
     self.logger: Logging.Log = Logging.Log(name=log_name, level=log_level)
     self.wlan = network.WLAN(interface.value)
     self.config: Config | None = None
+
+  def _config_(self, config) -> None:
+    """Applies wlan.config() settings and static IP settings (if applicable).
+    
+    Parameters:
+      config (WiFi.Config): The configuration to apply.
+    
+    Notes:
+      If 'ip' is present in config, the static IP configuration will be applied with the provided values.
+      If 'ip' is not present, the static IP configuration will not be changed.
+      If 'hostname', 'mac', 'channel', 'reconnects', 'security', 'hidden', 'key', 'txpower', or 'pm' are present in config, they will be applied.
+      If any of the above parameters are not present in config, their values will not be changed.
+    """
+    _config: Config = config
+    self.config = _config
+    config_dict = self.config.to_dict()
+    
+    # Apply static IP configuration if provided
+    if 'ip' in config_dict:
+      ip_config_tuple = (config_dict['ip'], config_dict.get('subnet', '255.255.255.0'), config_dict.get('gateway', '0.0.0.0'), config_dict.get('dns', '8.8.8.8'))
+      self.logger.info(f"Setting static IP config: {ip_config_tuple}")
+      self.wlan.ifconfig(tuple(ip_config_tuple))
+            
+    # Apply general configuration parameters
+    config_params = {
+      'hostname': None, 'mac': None, 'channel': None, 'reconnects': None, 
+      'security': None, 'hidden': None, 'key': None, 'txpower': None, 'pm': None
+    }
+    for key in config_params.keys():
+      if key in config_dict:
+        try:
+          self.wlan.config(**{key: config_dict[key]})
+        except (ValueError, TypeError) as e:
+          # Log non-critical errors for unsupported config keys
+          self.logger.warning(f"Warning: Could not set config param '{key}'. Error: {e}")
+  def getConfig(self, configName: str):
+    return self.wlan.config(configName)
+  def getSSID(self) -> str:
+    return self.wlan.config("essid")
+  def getPassword (self) -> str:
+    return self.wlan.config("password")
+  def getHostIP(self) -> NetworkBasic.IPV4Address:
+    return NetworkBasic.IPV4Address(self.wlan.ifconfig()[0])
+  def getNetmask(self) -> NetworkBasic.IPV4Address:
+    return NetworkBasic.IPV4Address(self.wlan.ifconfig()[1])
+  def getGateway(self) -> NetworkBasic.IPV4Address:
+    return NetworkBasic.IPV4Address(self.wlan.ifconfig()[2])
+  def getDNS(self) -> NetworkBasic.IPV4Address:
+    return NetworkBasic.IPV4Address(self.wlan.ifconfig()[3])
+  def getMAC_Bytes(self) -> bytes:
+    return self.wlan.config("mac")
+  def getMAC_Str(self) -> str:
+    return "-".join([f"{b:02X}" for b in self.getMAC_Bytes()])
+  def getHostname(self) -> str:
+    try: 
+      return self.wlan.config("dhcp_hostname")
+    except:
+      return self.wlan.config("hostname")
+  def isConnected(self) -> bool:
+    return self.wlan.isconnected()
+
+class SyncConnector(Connector):
+  """Handles Synchronous activation, connection, and configuration of the Wi-Fi interface."""
   def activate(self, timeout_ms: int = -1, retry_count: int = 8, retry_interval_ms: int | None = None) -> bool:
     """Activates the Wi-Fi interface.
     Parameters:
@@ -188,40 +250,6 @@ class Connector:
     else:
       self.logger.info("WiFi is already deactivated.")
       return True
-  def _config_(self, config) -> None:
-    """Applies wlan.config() settings and static IP settings (if applicable).
-    
-    Parameters:
-        config (WiFi.Config): The configuration to apply.
-    
-    Notes:
-        If 'ip' is present in config, the static IP configuration will be applied with the provided values.
-        If 'ip' is not present, the static IP configuration will not be changed.
-        If 'hostname', 'mac', 'channel', 'reconnects', 'security', 'hidden', 'key', 'txpower', or 'pm' are present in config, they will be applied.
-        If any of the above parameters are not present in config, their values will not be changed.
-    """
-    _config: Config = config
-    self.config = _config
-    config_dict = self.config.to_dict()
-    
-    # Apply static IP configuration if provided
-    if 'ip' in config_dict:
-        ip_config_tuple = (config_dict['ip'], config_dict.get('subnet', '255.255.255.0'), config_dict.get('gateway', '0.0.0.0'), config_dict.get('dns', '8.8.8.8'))
-        self.logger.info(f"Setting static IP config: {ip_config_tuple}")
-        self.wlan.ifconfig(tuple(ip_config_tuple))
-            
-    # Apply general configuration parameters
-    config_params = {
-        'hostname': None, 'mac': None, 'channel': None, 'reconnects': None, 
-        'security': None, 'hidden': None, 'key': None, 'txpower': None, 'pm': None
-    }
-    for key in config_params.keys():
-        if key in config_dict:
-            try:
-                self.wlan.config(**{key: config_dict[key]})
-            except (ValueError, TypeError) as e:
-                # Log non-critical errors for unsupported config keys
-                self.logger.warning(f"Warning: Could not set config param '{key}'. Error: {e}")
   def connect(self, config: Config, timeout_ms: int = -1, retry_count: int = 8, retry_interval_ms: int | None = None) -> bool:
     """Connects to a Wi-Fi network using the provided configuration.
     Parameters:
@@ -348,32 +376,194 @@ class Connector:
     self.disconnect()
     self.deactivate()
     self.logger.info("WiFi connection closed.")
-  
-  def getConfig(self, configName: str):
-    return self.wlan.config(configName)
-  def getSSID(self) -> str:
-    return self.wlan.config("essid")
-  def getPassword (self) -> str:
-    return self.wlan.config("password")
-  def getHostIP(self) -> NetworkBasic.IPV4Address:
-    return NetworkBasic.IPV4Address(self.wlan.ifconfig()[0])
-  def getNetmask(self) -> NetworkBasic.IPV4Address:
-    return NetworkBasic.IPV4Address(self.wlan.ifconfig()[1])
-  def getGateway(self) -> NetworkBasic.IPV4Address:
-    return NetworkBasic.IPV4Address(self.wlan.ifconfig()[2])
-  def getDNS(self) -> NetworkBasic.IPV4Address:
-    return NetworkBasic.IPV4Address(self.wlan.ifconfig()[3])
-  def getMAC_Bytes(self) -> bytes:
-    return self.wlan.config("mac")
-  def getMAC_Str(self) -> str:
-    return "-".join([f"{b:02X}" for b in self.getMAC_Bytes()])
-  def getHostname(self) -> str:
-    try: 
-      return self.wlan.config("dhcp_hostname")
-    except:
-      return self.wlan.config("hostname")
-  def isConnected(self) -> bool:
-    return self.wlan.isconnected()
+
+class AsyncConnector(Connector):
+  """Handles Asynchronous activation, connection, and configuration of the Wi-Fi interface."""
+  async def activate(self, timeout_ms: int = -1, retry_count: int = 8, retry_interval_ms: int | None = None) -> bool:
+    """Activates the Wi-Fi interface.
+    Parameters:
+      timeout_ms (int): The timeout for waiting for the Wi-Fi interface to become active (default: -1).
+      retry_count (int): The number of times to retry activating the Wi-Fi interface (default: 8).
+      retry_interval_ms (int | None): The interval at which to retry activating the Wi-Fi interface (default: None).
+    Returns:
+      bool: True if the Wi-Fi interface was successfully activated, False otherwise.
+    Notes:
+      If timeout_ms is -1, the function will not wait for the Wi-Fi interface to become active.
+      If retry_interval_ms is None, the function will use the interval_ms attribute of the class instance.
+    """
+    if retry_interval_ms is None: retry_interval_ms = self.interval_ms
+    if not self.wlan.active():
+      self.logger.info("Activing... ")
+      self.wlan.active(True)
+      for i in range(retry_count):
+        if await Sleep.async_wait_until(lambda: self.wlan.active(), timeout_ms=timeout_ms, interval_ms=retry_interval_ms):
+          break
+        self.logger.info("Activing... ")
+      if self.wlan.active():
+        self.logger.info("Activated.")
+        return True
+      else:
+        self.logger.warning("Failed to activate.")
+        return False
+    else:
+      self.logger.info("WiFi is already actived.")
+      return True
+    
+  async def deactivate(self, timeout_ms: int = -1, retry_count: int = 8, retry_interval_ms: int | None = None) -> bool:
+    """Deactivates the Wi-Fi interface.
+    Parameters:
+      timeout_ms (int): The timeout for waiting for the Wi-Fi interface to become inactive (default: -1).
+      retry_count (int): The number of times to retry deactivating the Wi-Fi interface (default: 8).
+      retry_interval_ms (int | None): The interval at which to retry deactivating the Wi-Fi interface (default: None).
+    Returns:
+      None
+    Notes:
+      If timeout_ms is -1, the function will not wait for the Wi-Fi interface to become inactive.
+      If retry_interval_ms is None, the function will use the interval_ms attribute of the class instance.
+    """
+    if retry_interval_ms is None: retry_interval_ms = self.interval_ms
+    if self.wlan.active():
+      self.logger.info("Deactiving... ")
+      self.wlan.active(False)
+      for i in range(retry_count):
+        if await Sleep.async_wait_until(lambda: not self.wlan.active(), timeout_ms=timeout_ms, interval_ms=retry_interval_ms):
+          break
+        self.logger.info("Deactiving... ")
+      if not self.wlan.active():
+        self.logger.info("Deactivated.")
+        return True
+      else:
+        self.logger.warning("Failed to deactivate.")
+        return False
+    else:
+      self.logger.info("WiFi is already deactivated.")
+      return True
+  async def connect(self, config: Config, timeout_ms: int = -1, retry_count: int = 8, retry_interval_ms: int | None = None) -> bool:
+    """Connects to a Wi-Fi network using the provided configuration.
+    Parameters:
+        config (Config): The configuration to use when connecting to the Wi-Fi network.
+        timeout_ms (int): The timeout for waiting for the Wi-Fi interface to become active (default: -1).
+        retry_count (int): The number of times to retry activating the Wi-Fi interface (default: 8).
+        retry_interval_ms (int | None): The interval at which to retry activating the Wi-Fi interface (default: None).
+    Returns:
+        bool: True if the Wi-Fi interface was successfully connected, False otherwise.
+    Notes:
+        If timeout_ms is -1, the function will not wait for the Wi-Fi interface to become active.
+        If retry_interval_ms is None, the function will use the interval_ms attribute of the class instance.
+    """
+    if retry_interval_ms is None: retry_interval_ms = self.interval_ms
+    _config: Config = config
+    if not self.wlan.active():
+      self.logger.info("WiFi is not actived. Activating now.")
+      if not await self.activate(timeout_ms=timeout_ms, retry_count=retry_count, retry_interval_ms=retry_interval_ms):
+        self.logger.warning("Connection aborted: WiFi failed to activate.")
+        return False
+    if self.wlan.isconnected():
+      self.logger.info("WiFi already connected. Reconnecting now.")
+      if not await self.disconnect(timeout_ms=timeout_ms, retry_count=retry_count, retry_interval_ms=retry_interval_ms):
+        self.logger.warning("Connection aborted: WiFi failed to disconnect.")
+        return False
+    # Apply configuration (like hostname, power mode, static IP)
+    self._config_(_config)
+    # Start the connection process
+    if (_config.ssid is not None):
+      self.logger.info(f"Attempting to connect to SSID: {_config.ssid}")
+      self.wlan.connect(_config.ssid, _config.password if _config.password is not None else "")
+    else:
+      self.logger.warning("Connection aborted: SSID not provided.")
+      return False
+    # Wait for the connection process to complete
+    if NetworkBasic.STATU.Statu(self.wlan.status()) == NetworkBasic.STATU.CONNECTING:
+      for i in range(retry_count):
+        self.logger.info("Wifi connecting... ({}/{})".format(i+1, retry_count))
+        if await Sleep.async_wait_until(lambda: NetworkBasic.STATU.Statu(self.wlan.status()) != NetworkBasic.STATU.CONNECTING, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+          self.logger.info("Wifi connected.")
+          break
+        else:
+          self.logger.warning("Wifi connection timeout.")
+          return False
+    if NetworkBasic.STATU.Statu(self.wlan.status()) == NetworkBasic.STATU.IDLE:
+      for i in range(retry_count):
+        self.logger.info("Wifi idle... ({}/{})".format(i+1, retry_count))
+        if await Sleep.async_wait_until(lambda: NetworkBasic.STATU.Statu(self.wlan.status()) != NetworkBasic.STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+          self.logger.info("Wifi idle.")
+          break
+        else:
+          self.logger.warning("Wifi idle timeout.")
+          return False
+    # Check the final connection status
+    final_status = NetworkBasic.STATU.Statu(self.wlan.status())
+    if final_status == NetworkBasic.STATU.GOT_IP:
+      # ip_config: tuple[str, str, str, str] = self.wlan.ifconfig()
+      self.logger.info(f"WiFi connected successfully. HostName: {self.getHostname()}, IP: {(self.getHostIP())}, MAC: {self.getMAC_Str()}")
+      return True
+    
+    elif final_status == NetworkBasic.STATU.IDLE:
+      self.logger.warning("WiFi connection failed: idle status")
+    elif final_status == NetworkBasic.STATU.WRONG_PASSWORD:
+      self.logger.warning("WiFi connection failed: wrong password")
+    elif final_status == NetworkBasic.STATU.NO_AP_FOUND:
+      self.logger.warning("WiFi connection failed: no AP found")
+    elif final_status == NetworkBasic.STATU.CONNECT_FAIL:
+      self.logger.warning("WiFi connection failed: connect fail")
+    else:
+      self.logger.warning("WiFi connection failed: unknown status")
+    await self.disconnect(timeout_ms=timeout_ms, retry_count=retry_count, retry_interval_ms=retry_interval_ms)
+    await self.deactivate(timeout_ms=timeout_ms, retry_count=retry_count, retry_interval_ms=retry_interval_ms)
+    return False
+  async def tryConnect(self, configs: list[Config], timeout_ms: int = -1, retry_count: int = 8, retry_interval_ms: int | None = None) -> bool:
+    """Connects to a Wi-Fi network using the provided list of configurations.
+    Parameters:
+        configs (list[Config]): The list of configurations to use when connecting to the Wi-Fi network.
+        timeout_ms (int): The timeout for waiting for the Wi-Fi interface to become active (default: -1).
+        retry_count (int): The number of times to retry activating the Wi-Fi interface (default: 8).
+        retry_interval_ms (int | None): The interval at which to retry activating the Wi-Fi interface (default: None).
+    Returns:
+        bool: True if the Wi-Fi interface was successfully connected, False otherwise.
+    Notes:
+        If timeout_ms is -1, the function will not wait for the Wi-Fi interface to become active.
+        If retry_interval_ms is None, the function will use the interval_ms attribute of the class instance.
+    """
+    for config in configs:
+      if await self.connect(config, timeout_ms=timeout_ms, retry_count=retry_count, retry_interval_ms=retry_interval_ms):
+        return True
+    return False
+  async def disconnect(self, timeout_ms: int = -1, retry_count: int = 8, retry_interval_ms: int | None = None) -> bool:
+    """Disconnects from the current Wi-Fi network.
+    Parameters:
+        timeout_ms (int): The timeout for waiting for the Wi-Fi interface to become disconnected (default: -1).
+        retry_count (int): The number of times to retry disconnecting the Wi-Fi interface (default: 8).
+        retry_interval_ms (int | None): The interval at which to retry disconnecting the Wi-Fi interface (default: None).
+    Returns:
+        bool: True if the Wi-Fi interface was successfully disconnected, False otherwise.
+    Notes:
+        If timeout_ms is -1, the function will not wait for the Wi-Fi interface to become disconnected.
+        If retry_interval_ms is None, the function will use the interval_ms attribute of the class instance.
+    """
+    if retry_interval_ms is None: retry_interval_ms = self.interval_ms
+    if self.wlan.isconnected():
+      self.wlan.disconnect()
+      # Wait for disconnect
+      for i in range(retry_count):
+        self.logger.info("Wifi disconnecting... ({}/{})".format(i+1, retry_count))
+        if await Sleep.async_wait_until(lambda: not self.wlan.isconnected() and NetworkBasic.Statu("", self.wlan.status()) == NetworkBasic.STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+          self.logger.info("Wifi disconnected.")
+          return True
+        else:
+          self.logger.warning("Wifi disconnect timeout.")
+      if not self.wlan.isconnected():
+        self.logger.info("Wifi disconnected.")
+        return True
+      else:
+        self.logger.warning("Wifi disconnect failed.")
+        return False
+    else:
+      self.logger.info("WiFi is not connected.")
+      return True
+  async def __del__(self):
+    await self.disconnect()
+    await self.deactivate()
+    self.logger.info("WiFi connection closed.")
 
 if __name__ == '__main__':
   logger = Logging.Log("Test Network", Logging.LEVEL.INFO)
@@ -383,7 +573,7 @@ if __name__ == '__main__':
     Config("SSID1", "PSWD1", hostname = "MicroPython")
   ]
   logger.info("Connect WiFi...")
-  wifi = Connector(log_level=Logging.LEVEL.INFO)
+  wifi = SyncConnector(log_level=Logging.LEVEL.INFO)
   for wifiConfig in wifiConfig_list:
     try: 
       if wifi.connect(wifiConfig, timeout_ms=10000, retry_count=8, retry_interval_ms=1000):
