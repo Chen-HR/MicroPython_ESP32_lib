@@ -26,7 +26,9 @@ except ImportError:
   from micropython_esp32_lib.Utils import ListenerHandler
 
 class State(Enum.Unit):
-  pass
+  def __eq__(self, other) -> bool:
+    if isinstance(other, State): return self.value == other.value
+    return False
 class STATE:
   BOUNCING = State("BOUNCING", 0)
   RELEASED = State("RELEASED", 1)
@@ -144,7 +146,7 @@ class InterruptDrivenStateDebounceButton(StateDebounceButton):
   class EdgeHandler(ListenerHandler.AsyncHandler):
     def __init__(self, handler):
       self.handler = handler
-    async def handle(self) -> None:
+    async def handle(self, obj = None, *args, **kwargs) -> None:
       asyncio.create_task(self.handler())
   def __init__(self, pin: machine.Pin, released_signal: Digital.Signal, 
                interval_ms: int = 32, 
@@ -219,26 +221,26 @@ class OnPressedListener(ListenerHandler.AsyncListener):
     self.button: BaseButton = button
     self.interval_ms: int = interval_ms
     self.logger: Logging.Log = Logging.Log(log_name, log_level)
-  async def listen(self) -> bool:
+  async def listen(self, obj = None, *args, **kwargs) -> bool:
     return await self.button.isToPressed()
 class OnReleasedListener(ListenerHandler.AsyncListener):
   def __init__(self, button: BaseButton, interval_ms: int = 10, log_name: str = "OnReleasedListener", log_level: Logging.Level = Logging.LEVEL.INFO):
     self.button: BaseButton = button
     self.interval_ms: int = interval_ms
     self.logger: Logging.Log = Logging.Log(log_name, log_level)
-  async def listen(self) -> bool:
+  async def listen(self, obj = None, *args, **kwargs) -> bool:
     return await self.button.isToReleased()
 
 if __name__ == "__main__":
   class TestSyncHandler(ListenerHandler.SyncHandler):
     def __init__(self, log_name: str, log_level: Logging.Level = Logging.LEVEL.INFO):
       self.logger = Logging.Log(log_name, log_level)
-    def handle(self) -> None:
+    def handle(self, obj = None, *args, **kwargs) -> None:
       self.logger.info("TestSyncHandler.handle() executed.")
   class TestAsyncHandler(ListenerHandler.AsyncHandler):
     def __init__(self, log_name: str, log_level: Logging.Level = Logging.LEVEL.INFO):
       self.logger = Logging.Log(log_name, log_level)
-    async def handle(self) -> None:
+    async def handle(self, obj = None, *args, **kwargs) -> None:
       await Sleep.async_ms(1)
       self.logger.info(f"TestAsyncHandler.handle() executed.")
 

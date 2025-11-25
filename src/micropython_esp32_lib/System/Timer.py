@@ -24,6 +24,9 @@ except ImportError:
 class Mode(Enum.Unit):
   """Timer operating modes."""
   pass
+  def __eq__(self, other) -> bool:
+    if isinstance(other, Mode): return self.value == other.value
+    return False
 class MODE:
   try:
     ONE_SHOT = Mode("ONE_SHOT", machine.Timer.ONE_SHOT)
@@ -31,7 +34,7 @@ class MODE:
   except AttributeError:
     Logging.Log("System.Timer.MODE", Logging.LEVEL.WARNING).warning("machine.Timer constants (ONE_SHOT, PERIODIC) not found. Timer functionality may be limited.")
 
-class IdManager(Enum.Unit):
+class IdManager: # TODO: Move to Utils
   """Timer ID manager."""
   def __init__(self, size: int = Utils.UINT16_MAX):
     self.size: int = size
@@ -329,7 +332,7 @@ class TimerListener(ListenerHandler.AsyncListener):
     self.active = False
     self.logger = Logging.Log(f"{log_name}", log_level)
     self.logger.debug(f"Created successfully.")
-  async def listen(self) -> bool:
+  async def listen(self, obj = None, *args, **kwargs) -> bool:
     if self.active:
       await Sleep.async_ms(self.interval_ms)
       if not self.repeat:
@@ -385,7 +388,7 @@ if __name__ == '__main__':
   class TestAsyncHandler(ListenerHandler.AsyncHandler):
     def __init__(self, log_name: str = "TestAsyncHandler", log_level: Logging.Level = Logging.LEVEL.INFO):
       self.logger = Logging.Log(log_name, log_level)
-    async def handle(self) -> None:
+    async def handle(self, obj = None, *args, **kwargs) -> None:
       await Sleep.async_ms(1)
       self.logger.info(f"Activate Async Handler Executed.")
   

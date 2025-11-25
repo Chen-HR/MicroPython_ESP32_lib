@@ -1,7 +1,14 @@
 """
 # file: ./Utils/Enum.py
 """
-class Unit:
+import abc
+
+try:
+  from ..Utils import Utils
+except ImportError:
+  import micropython_esp32_lib.Utils.Utils as Utils
+
+class Unit(abc.ABC):
   def __init__(self, name: str, value: int):
     """
     Initialize a Code object with a name and code.
@@ -18,13 +25,12 @@ class Unit:
     self.value: int = value
   def __str__(self) -> str:
     return self.name
-  def __int__(self) -> int:
-    return self.value
   def __repr__(self) -> str:
     return f"Unit({self.name}, {self.value})"
+  @abc.abstractmethod
   def __eq__(self, other) -> bool:
     if isinstance(other, Unit):
       return self.value == other.value
-    raise ValueError(f"Can't compare with {type(other)}")
+    return False  
   def __ne__(self, other) -> bool:
     return not self.__eq__(other)

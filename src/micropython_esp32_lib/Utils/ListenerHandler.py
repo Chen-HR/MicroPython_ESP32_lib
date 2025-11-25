@@ -25,11 +25,11 @@ class BaseHandler(abc.ABC):
     self.kwargs = kwargs
 class SyncHandler(BaseHandler):
   @abc.abstractmethod
-  def handle(self) -> None: # TODO: support raise exception
+  def handle(self, obj = None, *args, **kwargs) -> None: # TODO: support raise exception
     pass
 class AsyncHandler(BaseHandler):
   @abc.abstractmethod
-  async def handle(self) -> None: # TODO: support raise exception
+  async def handle(self, obj = None, *args, **kwargs) -> None: # TODO: support raise exception
     pass
 
 
@@ -44,13 +44,14 @@ class BaseListener(abc.ABC):
     """
     self.args = args
     self.kwargs = kwargs
+    self.obj = None
 class SyncListener(BaseListener):
   @abc.abstractmethod
-  def listen(self) -> bool: # TODO: support raise exception
+  def listen(self, obj = None, *args, **kwargs) -> bool: # TODO: support raise exception
     pass
 class AsyncListener(BaseListener):
   @abc.abstractmethod
-  async def listen(self) -> bool: # TODO: support raise exception
+  async def listen(self, obj = None, *args, **kwargs) -> bool: # TODO: support raise exception
     pass
 
 class ListenerHandler(abc.ABC):
@@ -136,7 +137,7 @@ class SyncListenerSyncHandler(SyncListenerHandler):
   async def listen(self):
     while self.active:
       if self.listener.listen():
-        thread.start_new_thread(self.handler.handle, ())
+        thread.start_new_thread(self.handler.handle, (self.listener.obj,))
       await Sleep.async_ms(self.period_ms)
 class SyncListenerAsyncHandler(SyncListenerHandler):
   """Listener Handler Class"""
@@ -158,7 +159,7 @@ class SyncListenerAsyncHandler(SyncListenerHandler):
   async def listen(self):
     while self.active:
       if self.listener.listen():
-        asyncio.create_task(self.handler.handle())
+        asyncio.create_task(self.handler.handle(self.listener.obj))
       await Sleep.async_ms(self.period_ms)
 class AsyncListenerSyncHandler(AsyncListenerHandler):
   """Listener Handler Class"""
@@ -180,7 +181,7 @@ class AsyncListenerSyncHandler(AsyncListenerHandler):
   async def listen(self):
     while self.active:
       if await self.listener.listen():
-        self.handler.handle()
+        thread.start_new_thread(self.handler.handle, (self.listener.obj,))
       await Sleep.async_ms(self.period_ms)
 class AsyncListenerAsyncHandler(AsyncListenerHandler):
   """Listener Handler Class"""
@@ -202,5 +203,5 @@ class AsyncListenerAsyncHandler(AsyncListenerHandler):
   async def listen(self):
     while self.active:
       if await self.listener.listen():
-        asyncio.create_task(self.handler.handle())
+        asyncio.create_task(self.handler.handle(self.listener.obj))
       await Sleep.async_ms(self.period_ms)

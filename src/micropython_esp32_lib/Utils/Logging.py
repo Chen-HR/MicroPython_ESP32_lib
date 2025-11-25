@@ -123,6 +123,9 @@ class Level(Enum.Unit):
   """Represents a logging level."""
   def __init__(self, name: str, level: int):
     super().__init__(name, level)
+  def __eq__(self, other) -> bool:
+    if isinstance(other, Level): return self.value == other.value
+    return False
   def __repr__(self) -> str:
     return f"Level({self.name}, {self.value})"
   def lower(self, level) -> bool:

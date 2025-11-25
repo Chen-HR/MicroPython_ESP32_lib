@@ -25,7 +25,7 @@ def syncTimeWithNTP(ntp_host: str = "time.google.com", log_level: Logging.Level 
     logger.info("Synchronization Done.")
     return True
   except Exception as e:
-    logger.error(f"Synchronization Failed. Error: {e}")
+    logger.warning(f"Synchronization Failed. Error: {e}")
     return False
 
 def syncTimeWithNTPs(ntp_hosts: list[str] = ["time.cloudflare.com", "time.google.com", "pool.ntp.org"], log_level: Logging.Level = Logging.LEVEL.INFO) -> bool:

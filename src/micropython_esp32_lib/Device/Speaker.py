@@ -1,3 +1,5 @@
+# file: micropython_esp32_lib/Device/Speaker.py
+
 """
 # file: ./Device/Speaker.py
 """
@@ -27,6 +29,7 @@ class Equal(Temperament):
   def calculate_frequency(cls, ref_freq: float, n: int) -> float:
     return ref_freq * pow(cls.RATIO, n)
 class EQUAL:
+  # ... (Omitted for brevity, content remains the same)
   # --- C3 OCTAVE (n = -21 to -10) ---
   C3 = Equal(Equal.calculate_frequency(Equal.A4_REF_FREQ, -21)) # ~= 130.81 Hz
   CS3 = Equal(Equal.calculate_frequency(Equal.A4_REF_FREQ, -20))# ~= 138.59 Hz
@@ -100,17 +103,32 @@ class NoteEvent:
 
 class Speaker:
   def __init__(self, pin: machine.Pin):
-    self.main = machine.PWM(machine.Pin(pin, Digital.MODE.OUT.value))
+    # Initialize PWM with a default valid frequency
+    self.main = machine.PWM(pin, freq=1000, duty_u16=0)
     self.quiet()
+
   def set(self, noteEvent: NoteEvent) -> None:
-    self.main.duty_u16(int(Utils.UINT16_MAX*noteEvent.amplitude))
-    self.main.freq(int(noteEvent.pitch.freq))
-    Sleep.sync_ms(noteEvent.duration_ms)
+    if noteEvent.pitch.freq > 0:
+      self.main.freq(int(noteEvent.pitch.freq))
+      self.main.duty_u16(int(Utils.UINT16_MAX * noteEvent.amplitude))
+    else:
+      # For quiet notes, just set duty to 0, don't change frequency
+      self.main.duty_u16(0)
+    
+    # The original implementation of `set` was blocking. 
+    # For async operation, the sleep should be handled by the caller.
+    # Sleep.sync_ms(noteEvent.duration_ms)
+
   def quiet(self) -> None:
-    self.set(NoteEvent(TEMPERAMENT.QUIET, 0.0, 0))
+    # Quiet the speaker by setting duty cycle to 0, not by setting freq to 0.
+    self.main.duty_u16(0)
+    
   def play(self, noteEvents: list[NoteEvent]):
     for noteEvent in noteEvents:
       self.set(noteEvent)
+      # This part is blocking and should be used with caution in async code
+      Sleep.sync_ms(noteEvent.duration_ms)
+      
   def __del__(self):
     self.quiet()
     self.main.deinit()

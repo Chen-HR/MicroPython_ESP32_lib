@@ -1,6 +1,8 @@
 """
 # file: ./Utils/py
 """
+import urandom
+
 # Common constants
 UINT16_MAX = 65535
 UINT08_MAX = 255
@@ -85,3 +87,143 @@ class Counter:
     return self.cnt
   def get_name(self) -> str:
     return self.name
+
+# class IdManager:
+#   def __init__(self, max_id: int, isSequence: bool = True) -> None:
+#     self.max_id = max_id
+#     self.used_ids = set()
+#     self.unused_ids = list(range(max_id))
+#     self.isSequence = isSequence
+#   def _get_sequence(self) -> int:
+#     if self.unused_ids:
+#       id = self.unused_ids.pop(0)
+#       self.used_ids.add(id)
+#       return id
+#     raise ValueError("All IDs are used")
+#   def _get_random(self) -> int:
+#     if self.unused_ids:
+#       id = urandom.choice(self.unused_ids)
+#       self.used_ids.add(id)
+#       return id
+#     raise ValueError("All IDs are used")
+#   def get(self) -> int:
+#     if self.isSequence:
+#       return self._get_sequence()
+#     else:
+#       return self._get_random()
+#   def set(self, id: int, autoRedirect: bool = True):
+#     if id not in self.used_ids:
+#       self.used_ids.add(id)
+#       self.unused_ids.remove(id)
+#       return id
+#     elif autoRedirect:
+#       return self.get()
+#     raise ValueError(f"ID {id} is already in use")
+
+class IdManager:
+  """
+  An optimized ID manager that is memory-efficient for large ID spaces.
+
+  This implementation avoids storing a list of unused IDs, making it suitable
+  for scenarios where `max_id` is very large. It only stores the set of
+  IDs that are currently in use.
+  """
+  def __init__(self, max_id: int, isSequence: bool = True) -> None:
+    """
+    Initializes the IdManager.
+
+    Args:
+      max_id: The maximum number of IDs (exclusive, from 0 to max_id - 1).
+      isSequence: If True, allocates IDs sequentially; otherwise, randomly.
+    """
+    if not isinstance(max_id, int) or max_id <= 0:
+      raise ValueError("max_id must be a positive integer")
+    
+    self.max_id = max_id
+    self.used_ids = set()
+    self.isSequence = isSequence
+    self._next_sequential_id = 0
+
+  def _check_if_full(self) -> None:
+    """Checks if all IDs are used and raises an error if so."""
+    if len(self.used_ids) >= self.max_id:
+      raise ValueError("All IDs are used")
+
+  def _get_sequence(self) -> int:
+    """
+    Gets the next available sequential ID.
+    
+    Time Complexity: Average O(1), Worst O(k) where k is the number of
+    consecutively used IDs from the last allocation point.
+    """
+    self._check_if_full()
+    
+    # Find the next available ID starting from the last known position
+    candidate_id = self._next_sequential_id
+    while candidate_id in self.used_ids:
+      candidate_id += 1
+      # This check prevents an infinite loop if the remaining IDs are at the
+      # beginning of the range, though _check_if_full() makes it rare.
+      if candidate_id >= self.max_id:
+        candidate_id = 0
+
+    self.used_ids.add(candidate_id)
+    self._next_sequential_id = candidate_id + 1
+    return candidate_id
+
+  def _get_random(self) -> int:
+    """
+    Gets a random available ID.
+
+    Time Complexity: Average O(1) when the load factor is low.
+    Performance degrades as the ID space fills up due to collisions.
+    """
+    self._check_if_full()
+    
+    while True:
+      candidate_id = random.randrange(0, self.max_id)
+      if candidate_id not in self.used_ids:
+        self.used_ids.add(candidate_id)
+        return candidate_id
+
+  def get(self) -> int:
+    """
+    Retrieves an ID based on the configured mode (sequential or random).
+    
+    Returns:
+      An available integer ID.
+
+    Raises:
+      ValueError: If all IDs are in use.
+    """
+    if self.isSequence:
+      return self._get_sequence()
+    else:
+      return self._get_random()
+
+  def set(self, id: int, autoRedirect: bool = True) -> int:
+    """
+    Manually reserves a specific ID.
+
+    Args:
+      id: The integer ID to reserve.
+      autoRedirect: If the ID is already used, get a new one automatically.
+
+    Returns:
+      The reserved ID or a new ID if autoRedirect is True.
+
+    Raises:
+      ValueError: If the ID is out of range, or if the ID is in use and
+                  autoRedirect is False.
+    """
+    if not 0 <= id < self.max_id:
+        raise ValueError(f"ID {id} is out of the valid range [0, {self.max_id - 1}]")
+
+    if id not in self.used_ids:
+      self.used_ids.add(id)
+      return id
+    elif autoRedirect:
+      return self.get()
+    
+    raise ValueError(f"ID {id} is already in use")
+

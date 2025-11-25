@@ -3,12 +3,104 @@ import network
 
 try: 
   from ..Utils import Logging
+  from ..Utils import Enum
   from ..System import Sleep
-  from . import Network
+  from ..System import Network
 except ImportError:
   from micropython_esp32_lib.Utils import Logging
+  from micropython_esp32_lib.Utils import Enum
   from micropython_esp32_lib.System import Sleep
   from micropython_esp32_lib.System import Network
+
+class Statu(Enum.Unit):
+  """WLAN connection status constants (network.STAT_*)"""
+  def __init__(self, name: str, code: int) -> None:
+    super().__init__(name, code)
+  def __repr__(self) -> str:
+    return f"Statu({self.name}, {self.value})"
+  def __eq__(self, other) -> bool:
+    if isinstance(other, Statu): return self.value == other.value
+    return False
+class STATU:
+  """WLAN connection status constants (network.STAT_*)"""
+  # Define fallback values in case MicroPython's network module lacks them
+  IDLE            : Statu = Statu("IDLE"           ,1000) # network.STAT_IDLE: no connection and no activity
+  CONNECTING      : Statu = Statu("CONNECTING"     ,1001) # network.STAT_CONNECTING: connecting in progress
+  GOT_IP          : Statu = Statu("GOT_IP"         ,1010) # network.STAT_GOT_IP: connection successful
+  NO_AP_FOUND     : Statu = Statu("NO_AP_FOUND"    ,201 ) # network.STAT_NO_AP_FOUND: failed because no access point replied
+  WRONG_PASSWORD  : Statu = Statu("WRONG_PASSWORD" ,202 ) # network.STAT_WRONG_PASSWORD: failed due to incorrect password
+  CONNECT_FAIL    : Statu = Statu("CONNECT_FAIL"   ,203 ) # network.STAT_CONNECT_FAIL: failed due to other problems
+  try:
+    IDLE            : Statu = Statu("IDLE"           ,network.STAT_IDLE          ) # type: ignore # network.STAT_IDLE: no connection and no activity
+    CONNECTING      : Statu = Statu("CONNECTING"     ,network.STAT_CONNECTING    ) # type: ignore # network.STAT_CONNECTING: connecting in progress
+    GOT_IP          : Statu = Statu("GOT_IP"         ,network.STAT_GOT_IP        ) # type: ignore # network.STAT_GOT_IP: connection successful
+    NO_AP_FOUND     : Statu = Statu("NO_AP_FOUND"    ,network.STAT_NO_AP_FOUND   ) # type: ignore # network.STAT_NO_AP_FOUND: failed because no access point replied
+    WRONG_PASSWORD  : Statu = Statu("WRONG_PASSWORD" ,network.STAT_WRONG_PASSWORD) # type: ignore # network.STAT_WRONG_PASSWORD: failed due to incorrect password
+    CONNECT_FAIL    : Statu = Statu("CONNECT_FAIL"   ,network.STAT_CONNECT_FAIL  ) # type: ignore # network.STAT_CONNECT_FAIL: failed due to other problems
+  except AttributeError:
+    tmp=Logging.Log("Network Constants Status", Logging.LEVEL.WARNING)
+    tmp.warning("Network status constants (`network.STAT_*`) not fully found. Using internal fallbacks.")
+    del tmp
+
+  @classmethod
+  def query(cls, code: int) -> Statu:
+    if code == cls.IDLE           .value : return cls.IDLE           
+    if code == cls.CONNECTING     .value : return cls.CONNECTING     
+    if code == cls.GOT_IP         .value : return cls.GOT_IP         
+    if code == cls.NO_AP_FOUND    .value : return cls.NO_AP_FOUND    
+    if code == cls.WRONG_PASSWORD .value : return cls.WRONG_PASSWORD 
+    if code == cls.CONNECT_FAIL   .value : return cls.CONNECT_FAIL   
+    return Statu("UNKNOWN", code)
+
+class PowerManagement(Enum.Unit):
+  """WLAN power management modes (network.PM_*)"""
+  def __init__(self, name: str, id: int):
+    super().__init__(name, id)
+  def __repr__(self) -> str:
+    return f"PowerManagement({self.name}, {self.value})"
+  def __eq__(self, other) -> bool:
+    if isinstance(other, PowerManagement): return self.value == other.value
+    return False
+class PM:
+  """WLAN power management modes (network.PM_*)"""
+  # MicroPython PM modes (often 0, 1, 2)
+  ACTIVE    : PowerManagement = PowerManagement("ACTIVE"    ,0)
+  POWERSAVE : PowerManagement = PowerManagement("POWERSAVE" ,1)
+  
+  try:
+    # Attempt to map MicroPython's specific constants if available
+    ACTIVE    : PowerManagement = PowerManagement("ACTIVE"    ,network.MODE_PERFORMANCE) # type: ignore
+    POWERSAVE : PowerManagement = PowerManagement("POWERSAVE" ,network.MODE_NONE       ) # type: ignore
+  except AttributeError:
+    try:
+      # Common esp32/esp8266 power modes
+      ACTIVE    : PowerManagement = PowerManagement("ACTIVE"    ,network.WLAN.PM_ACTIVE   ) # type: ignore
+      POWERSAVE : PowerManagement = PowerManagement("POWERSAVE" ,network.WLAN.PM_POWERSAVE) # type: ignore
+    except AttributeError:
+      tmp=Logging.Log("Network Constants Power Management", Logging.LEVEL.WARNING)
+      tmp.warning("Network power management constants (`network.PM_*`) not fully found. Using internal fallbacks.")
+      del tmp
+
+class Mode(Enum.Unit):
+  """WLAN operating modes (network.MODE_*)"""
+  def __init__(self, name: str, id: int):
+    super().__init__(name, id)
+  def __repr__(self) -> str:
+    return f"Mode({self.name}, {self.value})"
+  def __eq__(self, other) -> bool:
+    if isinstance(other, Mode): return self.value == other.value
+    return False
+class MODE:
+  """WLAN operating modes (network.MODE_*)"""
+  STA : Mode = Mode("STA", 1) # Station mode (client)
+  AP  : Mode = Mode("AP" , 2) # Access Point mode
+  try:
+    STA : Mode = Mode("STA", network.STA_IF) # type: ignore # Station mode (client)
+    AP  : Mode = Mode("AP" , network.AP_IF ) # type: ignore # Access Point mode
+  except AttributeError:
+    tmp=Logging.Log("Network Constants Mode", Logging.LEVEL.WARNING)
+    tmp.warning("Network interface constants (`network.STA_IF`, `network.AP_IF`) not fully found. Using internal fallbacks (1, 2).")
+    del tmp
 
 class Config:
   """Configuration container for WLAN connection and settings."""
@@ -63,7 +155,7 @@ class Config:
     self.hidden: bool | None = hidden
     self.key: str | None = key
     self.txpower: int | float | None = txpower
-    self.pm: Network.PowerManagement | None = pm
+    self.pm: PowerManagement | None = pm
     self.logger = Logging.Log(log_name, log_level)
   def __str__(self) -> str:
     return f"WiFi.Config({self.ssid}, {self.password})"
@@ -111,7 +203,7 @@ class Config:
       raise e
     return config
 class Connector:
-  def __init__(self, interface: Network.Mode = Network.MODE.STA, interval_ms: int = 100, connecting_timeout_ms: int = 10000, idle_timeout_ms: int = 10000, log_name: str = "Wi-Fi Connector", log_level: Logging.Level = Logging.LEVEL.INFO) -> None:
+  def __init__(self, interface: Mode = MODE.STA, interval_ms: int = 100, connecting_timeout_ms: int = 10000, idle_timeout_ms: int = 10000, log_name: str = "Wi-Fi Connector", log_level: Logging.Level = Logging.LEVEL.INFO) -> None:
     """Initializes the Wi-Fi Connector with the given parameters.
     Parameters:
       interface (int): The mode of the Wi-Fi interface (default: MODE.STA).
@@ -180,7 +272,7 @@ class Connector:
   def getMAC_Bytes(self) -> bytes:
     return self.wlan.config("mac")
   def getMAC_Str(self) -> str:
-    return "-".join([f"{b:02X}" for b in self.getMAC_Bytes()])
+    return ":".join([f"{b:02X}" for b in self.getMAC_Bytes()])
   def getHostname(self) -> str:
     try: 
       return self.wlan.config("dhcp_hostname")
@@ -285,38 +377,38 @@ class SyncConnector(Connector):
       self.logger.warning("Connection aborted: SSID not provided.")
       return False
     # Wait for the connection process to complete
-    if Network.STATU.Statu(self.wlan.status()) == Network.STATU.CONNECTING:
+    if STATU.query(self.wlan.status()) == STATU.CONNECTING:
       for i in range(retry_count):
         self.logger.info("Wifi connecting... ({}/{})".format(i+1, retry_count))
-        if Sleep.sync_wait_until(lambda: Network.STATU.Statu(self.wlan.status()) != Network.STATU.CONNECTING, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+        if Sleep.sync_wait_until(lambda: STATU.query(self.wlan.status()) != STATU.CONNECTING, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
           self.logger.info("Wifi connected.")
           break
         else:
           self.logger.warning("Wifi connection timeout.")
           return False
-    if Network.STATU.Statu(self.wlan.status()) == Network.STATU.IDLE:
+    if STATU.query(self.wlan.status()) == STATU.IDLE:
       for i in range(retry_count):
         self.logger.info("Wifi idle... ({}/{})".format(i+1, retry_count))
-        if Sleep.sync_wait_until(lambda: Network.STATU.Statu(self.wlan.status()) != Network.STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+        if Sleep.sync_wait_until(lambda: STATU.query(self.wlan.status()) != STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
           self.logger.info("Wifi idle.")
           break
         else:
           self.logger.warning("Wifi idle timeout.")
           return False
     # Check the final connection status
-    final_status = Network.STATU.Statu(self.wlan.status())
-    if final_status == Network.STATU.GOT_IP:
+    final_status = STATU.query(self.wlan.status())
+    if final_status == STATU.GOT_IP:
       # ip_config: tuple[str, str, str, str] = self.wlan.ifconfig()
       self.logger.info(f"WiFi connected successfully. HostName: {self.getHostname()}, IP: {(self.getHostIP())}, MAC: {self.getMAC_Str()}")
       return True
     
-    elif final_status == Network.STATU.IDLE:
+    elif final_status == STATU.IDLE:
       self.logger.warning("WiFi connection failed: idle status")
-    elif final_status == Network.STATU.WRONG_PASSWORD:
+    elif final_status == STATU.WRONG_PASSWORD:
       self.logger.warning("WiFi connection failed: wrong password")
-    elif final_status == Network.STATU.NO_AP_FOUND:
+    elif final_status == STATU.NO_AP_FOUND:
       self.logger.warning("WiFi connection failed: no AP found")
-    elif final_status == Network.STATU.CONNECT_FAIL:
+    elif final_status == STATU.CONNECT_FAIL:
       self.logger.warning("WiFi connection failed: connect fail")
     else:
       self.logger.warning("WiFi connection failed: unknown status")
@@ -358,7 +450,7 @@ class SyncConnector(Connector):
       # Wait for disconnect
       for i in range(retry_count):
         self.logger.info("Wifi disconnecting... ({}/{})".format(i+1, retry_count))
-        if Sleep.sync_wait_until(lambda: not self.wlan.isconnected() and Network.Statu("", self.wlan.status()) == Network.STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+        if Sleep.sync_wait_until(lambda: not self.wlan.isconnected() and Statu("", self.wlan.status()) == STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
           self.logger.info("Wifi disconnected.")
           return True
         else:
@@ -473,38 +565,38 @@ class AsyncConnector(Connector):
       self.logger.warning("Connection aborted: SSID not provided.")
       return False
     # Wait for the connection process to complete
-    if Network.STATU.Statu(self.wlan.status()) == Network.STATU.CONNECTING:
+    if STATU.query(self.wlan.status()) == STATU.CONNECTING:
       for i in range(retry_count):
         self.logger.info("Wifi connecting... ({}/{})".format(i+1, retry_count))
-        if await Sleep.async_wait_until(lambda: Network.STATU.Statu(self.wlan.status()) != Network.STATU.CONNECTING, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+        if await Sleep.async_wait_until(lambda: STATU.query(self.wlan.status()) != STATU.CONNECTING, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
           self.logger.info("Wifi connected.")
           break
         else:
           self.logger.warning("Wifi connection timeout.")
           return False
-    if Network.STATU.Statu(self.wlan.status()) == Network.STATU.IDLE:
+    if STATU.query(self.wlan.status()) == STATU.IDLE:
       for i in range(retry_count):
         self.logger.info("Wifi idle... ({}/{})".format(i+1, retry_count))
-        if await Sleep.async_wait_until(lambda: Network.STATU.Statu(self.wlan.status()) != Network.STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+        if await Sleep.async_wait_until(lambda: STATU.query(self.wlan.status()) != STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
           self.logger.info("Wifi idle.")
           break
         else:
           self.logger.warning("Wifi idle timeout.")
           return False
     # Check the final connection status
-    final_status = Network.STATU.Statu(self.wlan.status())
-    if final_status == Network.STATU.GOT_IP:
+    final_status = STATU.query(self.wlan.status())
+    if final_status == STATU.GOT_IP:
       # ip_config: tuple[str, str, str, str] = self.wlan.ifconfig()
       self.logger.info(f"WiFi connected successfully. HostName: {self.getHostname()}, IP: {(self.getHostIP())}, MAC: {self.getMAC_Str()}")
       return True
     
-    elif final_status == Network.STATU.IDLE:
+    elif final_status == STATU.IDLE:
       self.logger.warning("WiFi connection failed: idle status")
-    elif final_status == Network.STATU.WRONG_PASSWORD:
+    elif final_status == STATU.WRONG_PASSWORD:
       self.logger.warning("WiFi connection failed: wrong password")
-    elif final_status == Network.STATU.NO_AP_FOUND:
+    elif final_status == STATU.NO_AP_FOUND:
       self.logger.warning("WiFi connection failed: no AP found")
-    elif final_status == Network.STATU.CONNECT_FAIL:
+    elif final_status == STATU.CONNECT_FAIL:
       self.logger.warning("WiFi connection failed: connect fail")
     else:
       self.logger.warning("WiFi connection failed: unknown status")
@@ -546,7 +638,7 @@ class AsyncConnector(Connector):
       # Wait for disconnect
       for i in range(retry_count):
         self.logger.info("Wifi disconnecting... ({}/{})".format(i+1, retry_count))
-        if await Sleep.async_wait_until(lambda: not self.wlan.isconnected() and Network.Statu("", self.wlan.status()) == Network.STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
+        if await Sleep.async_wait_until(lambda: not self.wlan.isconnected() and Statu("", self.wlan.status()) == STATU.IDLE, timeout_ms=timeout_ms, interval_ms=self.interval_ms):
           self.logger.info("Wifi disconnected.")
           return True
         else:
